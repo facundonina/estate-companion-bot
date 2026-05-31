@@ -9,11 +9,17 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as PropiedadesRouteImport } from './routes/propiedades'
 import { Route as AgenteRouteImport } from './routes/agente'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PropiedadesIdRouteImport } from './routes/propiedades.$id'
 
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PropiedadesRoute = PropiedadesRouteImport.update({
   id: '/propiedades',
   path: '/propiedades',
@@ -39,12 +45,14 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/agente': typeof AgenteRoute
   '/propiedades': typeof PropiedadesRouteWithChildren
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/propiedades/$id': typeof PropiedadesIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/agente': typeof AgenteRoute
   '/propiedades': typeof PropiedadesRouteWithChildren
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/propiedades/$id': typeof PropiedadesIdRoute
 }
 export interface FileRoutesById {
@@ -52,24 +60,44 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/agente': typeof AgenteRoute
   '/propiedades': typeof PropiedadesRouteWithChildren
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/propiedades/$id': typeof PropiedadesIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/agente' | '/propiedades' | '/propiedades/$id'
+  fullPaths:
+    | '/'
+    | '/agente'
+    | '/propiedades'
+    | '/sitemap.xml'
+    | '/propiedades/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/agente' | '/propiedades' | '/propiedades/$id'
-  id: '__root__' | '/' | '/agente' | '/propiedades' | '/propiedades/$id'
+  to: '/' | '/agente' | '/propiedades' | '/sitemap.xml' | '/propiedades/$id'
+  id:
+    | '__root__'
+    | '/'
+    | '/agente'
+    | '/propiedades'
+    | '/sitemap.xml'
+    | '/propiedades/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AgenteRoute: typeof AgenteRoute
   PropiedadesRoute: typeof PropiedadesRouteWithChildren
+  SitemapDotxmlRoute: typeof SitemapDotxmlRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/propiedades': {
       id: '/propiedades'
       path: '/propiedades'
@@ -117,6 +145,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AgenteRoute: AgenteRoute,
   PropiedadesRoute: PropiedadesRouteWithChildren,
+  SitemapDotxmlRoute: SitemapDotxmlRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
