@@ -50,7 +50,7 @@ function PropiedadesPage() {
   const navigate = useNavigate({ from: Route.fullPath });
 
   const update = (patch: Partial<PropSearch>) =>
-    navigate({ search: (prev) => ({ ...prev, ...patch }) });
+    navigate({ search: (prev: PropSearch) => ({ ...prev, ...patch }) });
 
   const filtered = properties.filter((p) => {
     if (search.tipo && p.tipo !== search.tipo) return false;
