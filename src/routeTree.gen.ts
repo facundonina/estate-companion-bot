@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as PropiedadesRouteImport } from './routes/propiedades'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as PropiedadesIdRouteImport } from './routes/propiedades.$id'
 
 const PropiedadesRoute = PropiedadesRouteImport.update({
   id: '/propiedades',
@@ -22,31 +23,39 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PropiedadesIdRoute = PropiedadesIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => PropiedadesRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/propiedades': typeof PropiedadesRoute
+  '/propiedades': typeof PropiedadesRouteWithChildren
+  '/propiedades/$id': typeof PropiedadesIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/propiedades': typeof PropiedadesRoute
+  '/propiedades': typeof PropiedadesRouteWithChildren
+  '/propiedades/$id': typeof PropiedadesIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/propiedades': typeof PropiedadesRoute
+  '/propiedades': typeof PropiedadesRouteWithChildren
+  '/propiedades/$id': typeof PropiedadesIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/propiedades'
+  fullPaths: '/' | '/propiedades' | '/propiedades/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/propiedades'
-  id: '__root__' | '/' | '/propiedades'
+  to: '/' | '/propiedades' | '/propiedades/$id'
+  id: '__root__' | '/' | '/propiedades' | '/propiedades/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  PropiedadesRoute: typeof PropiedadesRoute
+  PropiedadesRoute: typeof PropiedadesRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
@@ -65,13 +74,42 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/propiedades/$id': {
+      id: '/propiedades/$id'
+      path: '/$id'
+      fullPath: '/propiedades/$id'
+      preLoaderRoute: typeof PropiedadesIdRouteImport
+      parentRoute: typeof PropiedadesRoute
+    }
   }
 }
 
+interface PropiedadesRouteChildren {
+  PropiedadesIdRoute: typeof PropiedadesIdRoute
+}
+
+const PropiedadesRouteChildren: PropiedadesRouteChildren = {
+  PropiedadesIdRoute: PropiedadesIdRoute,
+}
+
+const PropiedadesRouteWithChildren = PropiedadesRoute._addFileChildren(
+  PropiedadesRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  PropiedadesRoute: PropiedadesRoute,
+  PropiedadesRoute: PropiedadesRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
