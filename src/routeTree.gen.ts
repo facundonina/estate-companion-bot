@@ -13,6 +13,7 @@ import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as PropiedadesRouteImport } from './routes/propiedades'
 import { Route as AgenteRouteImport } from './routes/agente'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as PropiedadesIndexRouteImport } from './routes/propiedades.index'
 import { Route as PropiedadesIdRouteImport } from './routes/propiedades.$id'
 
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
@@ -35,6 +36,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PropiedadesIndexRoute = PropiedadesIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => PropiedadesRoute,
+} as any)
 const PropiedadesIdRoute = PropiedadesIdRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -47,13 +53,14 @@ export interface FileRoutesByFullPath {
   '/propiedades': typeof PropiedadesRouteWithChildren
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/propiedades/$id': typeof PropiedadesIdRoute
+  '/propiedades/': typeof PropiedadesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/agente': typeof AgenteRoute
-  '/propiedades': typeof PropiedadesRouteWithChildren
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/propiedades/$id': typeof PropiedadesIdRoute
+  '/propiedades': typeof PropiedadesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -62,6 +69,7 @@ export interface FileRoutesById {
   '/propiedades': typeof PropiedadesRouteWithChildren
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/propiedades/$id': typeof PropiedadesIdRoute
+  '/propiedades/': typeof PropiedadesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -71,8 +79,9 @@ export interface FileRouteTypes {
     | '/propiedades'
     | '/sitemap.xml'
     | '/propiedades/$id'
+    | '/propiedades/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/agente' | '/propiedades' | '/sitemap.xml' | '/propiedades/$id'
+  to: '/' | '/agente' | '/sitemap.xml' | '/propiedades/$id' | '/propiedades'
   id:
     | '__root__'
     | '/'
@@ -80,6 +89,7 @@ export interface FileRouteTypes {
     | '/propiedades'
     | '/sitemap.xml'
     | '/propiedades/$id'
+    | '/propiedades/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -119,6 +129,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/propiedades/': {
+      id: '/propiedades/'
+      path: '/'
+      fullPath: '/propiedades/'
+      preLoaderRoute: typeof PropiedadesIndexRouteImport
+      parentRoute: typeof PropiedadesRoute
+    }
     '/propiedades/$id': {
       id: '/propiedades/$id'
       path: '/$id'
@@ -131,10 +148,12 @@ declare module '@tanstack/react-router' {
 
 interface PropiedadesRouteChildren {
   PropiedadesIdRoute: typeof PropiedadesIdRoute
+  PropiedadesIndexRoute: typeof PropiedadesIndexRoute
 }
 
 const PropiedadesRouteChildren: PropiedadesRouteChildren = {
   PropiedadesIdRoute: PropiedadesIdRoute,
+  PropiedadesIndexRoute: PropiedadesIndexRoute,
 }
 
 const PropiedadesRouteWithChildren = PropiedadesRoute._addFileChildren(
@@ -150,3 +169,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
