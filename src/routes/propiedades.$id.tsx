@@ -225,7 +225,6 @@ function PropertyDetail() {
 
           <LeadForm property={p} />
         </aside>
-        </aside>
       </div>
 
       {/* Similar */}
