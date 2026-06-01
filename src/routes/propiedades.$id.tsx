@@ -151,9 +151,11 @@ function PropertyDetail() {
           {/* Description */}
           <div className="mt-8">
             <h2 className="text-xl font-bold text-foreground">Descripción</h2>
-            <p className="mt-3 leading-relaxed text-muted-foreground">
-              {p.descripcion}
-            </p>
+            <div className="mt-3 space-y-3 leading-relaxed text-muted-foreground">
+              {descriptionParagraphs.map((par, i) => (
+                <p key={i}>{par}</p>
+              ))}
+            </div>
           </div>
 
           {/* Features */}
