@@ -86,6 +86,7 @@ function PropertyDetail() {
     .slice(0, 3);
 
   const isLand = p.tipo === "Lote" || p.tipo === "Campo";
+  const descriptionParagraphs = buildLongDescription(p);
 
   return (
     <div className="min-h-screen bg-background">
