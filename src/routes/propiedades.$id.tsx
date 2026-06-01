@@ -13,8 +13,10 @@ import {
 } from "lucide-react";
 import { properties } from "@/data/properties";
 import { formatPrice, propertyTitle } from "@/lib/format";
+import { buildLongDescription } from "@/lib/description";
 import { PropertyMedia } from "@/components/PropertyMedia";
 import { PropertyCard } from "@/components/PropertyCard";
+import { LeadForm } from "@/components/LeadForm";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 
