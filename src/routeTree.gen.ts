@@ -36,9 +36,9 @@ const PropiedadesIndexRoute = PropiedadesIndexRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const PropiedadesIdRoute = PropiedadesIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => PropiedadesRoute,
+  id: '/propiedades/$id',
+  path: '/propiedades/$id',
+  getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -86,6 +86,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AgenteRoute: typeof AgenteRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
+  PropiedadesIdRoute: typeof PropiedadesIdRoute
   PropiedadesIndexRoute: typeof PropiedadesIndexRoute
 }
 
@@ -121,10 +122,10 @@ declare module '@tanstack/react-router' {
     }
     '/propiedades/$id': {
       id: '/propiedades/$id'
-      path: '/$id'
+      path: '/propiedades/$id'
       fullPath: '/propiedades/$id'
       preLoaderRoute: typeof PropiedadesIdRouteImport
-      parentRoute: typeof PropiedadesRoute
+      parentRoute: typeof rootRouteImport
     }
   }
 }
@@ -133,6 +134,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AgenteRoute: AgenteRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
+  PropiedadesIdRoute: PropiedadesIdRoute,
   PropiedadesIndexRoute: PropiedadesIndexRoute,
 }
 export const routeTree = rootRouteImport
