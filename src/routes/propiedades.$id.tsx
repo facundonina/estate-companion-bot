@@ -192,7 +192,7 @@ function PropertyDetail() {
         </div>
 
         {/* Sidebar */}
-        <aside className="lg:sticky lg:top-24 lg:self-start">
+        <aside className="space-y-6 lg:sticky lg:top-24 lg:self-start">
           <div className="rounded-2xl border border-border bg-card p-6 shadow-elevated">
             <p className="text-sm text-muted-foreground">Precio</p>
             <p className="font-serif text-3xl font-bold text-primary">
@@ -222,6 +222,9 @@ function PropertyDetail() {
               Nuestro asistente te responde al instante y coordina la visita.
             </p>
           </div>
+
+          <LeadForm property={p} />
+        </aside>
         </aside>
       </div>
 
