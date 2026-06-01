@@ -13,8 +13,10 @@ import {
 } from "lucide-react";
 import { properties } from "@/data/properties";
 import { formatPrice, propertyTitle } from "@/lib/format";
+import { buildLongDescription } from "@/lib/description";
 import { PropertyMedia } from "@/components/PropertyMedia";
 import { PropertyCard } from "@/components/PropertyCard";
+import { LeadForm } from "@/components/LeadForm";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 
@@ -84,6 +86,7 @@ function PropertyDetail() {
     .slice(0, 3);
 
   const isLand = p.tipo === "Lote" || p.tipo === "Campo";
+  const descriptionParagraphs = buildLongDescription(p);
 
   return (
     <div className="min-h-screen bg-background">
@@ -148,9 +151,11 @@ function PropertyDetail() {
           {/* Description */}
           <div className="mt-8">
             <h2 className="text-xl font-bold text-foreground">Descripción</h2>
-            <p className="mt-3 leading-relaxed text-muted-foreground">
-              {p.descripcion}
-            </p>
+            <div className="mt-3 space-y-3 leading-relaxed text-muted-foreground">
+              {descriptionParagraphs.map((par, i) => (
+                <p key={i}>{par}</p>
+              ))}
+            </div>
           </div>
 
           {/* Features */}
@@ -187,7 +192,7 @@ function PropertyDetail() {
         </div>
 
         {/* Sidebar */}
-        <aside className="lg:sticky lg:top-24 lg:self-start">
+        <aside className="space-y-6 lg:sticky lg:top-24 lg:self-start">
           <div className="rounded-2xl border border-border bg-card p-6 shadow-elevated">
             <p className="text-sm text-muted-foreground">Precio</p>
             <p className="font-serif text-3xl font-bold text-primary">
@@ -217,6 +222,8 @@ function PropertyDetail() {
               Nuestro asistente te responde al instante y coordina la visita.
             </p>
           </div>
+
+          <LeadForm property={p} />
         </aside>
       </div>
 
