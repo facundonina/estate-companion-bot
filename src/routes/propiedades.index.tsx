@@ -18,7 +18,7 @@ const departamentos = Array.from(
   new Set(properties.map((p) => p.departamento)),
 ).sort();
 
-export const Route = createFileRoute("/propiedades")({
+export const Route = createFileRoute("/propiedades/")({
   validateSearch: (search: Record<string, unknown>): PropSearch => ({
     q: typeof search.q === "string" ? search.q : undefined,
     tipo: typeof search.tipo === "string" ? search.tipo : undefined,
