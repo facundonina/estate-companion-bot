@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { BedDouble, Bath, Maximize, MapPin } from "lucide-react";
 import type { Property } from "@/data/properties";
 import { formatPrice, propertyTitle } from "@/lib/format";
+import { propertyImage } from "@/lib/propertyImage";
 import { PropertyMedia } from "./PropertyMedia";
 
 export function PropertyCard({ property }: { property: Property }) {
@@ -12,7 +13,12 @@ export function PropertyCard({ property }: { property: Property }) {
       className="group flex flex-col overflow-hidden rounded-2xl bg-card shadow-card transition-all duration-300 hover:-translate-y-1 hover:shadow-elevated"
     >
       <div className="relative">
-        <PropertyMedia tipo={property.tipo} className="aspect-[4/3] w-full" />
+        <PropertyMedia
+          tipo={property.tipo}
+          src={propertyImage(property)}
+          alt={propertyTitle(property.tipo, property.barrio, property.dormitorios)}
+          className="aspect-[4/3] w-full"
+        />
         <span className="absolute left-3 top-3 rounded-full bg-background/90 px-3 py-1 text-xs font-semibold text-foreground backdrop-blur">
           {property.tipo}
         </span>
