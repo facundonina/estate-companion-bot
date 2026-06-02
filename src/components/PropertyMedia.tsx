@@ -1,4 +1,5 @@
 import { Building2, Home, Trees, Tractor } from "lucide-react";
+import { useState } from "react";
 
 const config: Record<
   string,
@@ -12,14 +13,20 @@ const config: Record<
 
 export function PropertyMedia({
   tipo,
+  src,
+  alt,
   className = "",
   iconSize = 56,
 }: {
   tipo: string;
+  src?: string;
+  alt?: string;
   className?: string;
   iconSize?: number;
 }) {
   const { icon: Icon, gradient } = config[tipo] ?? config.Casa;
+  const [failed, setFailed] = useState(false);
+
   return (
     <div
       className={`relative flex items-center justify-center overflow-hidden bg-gradient-to-br ${gradient} ${className}`}
@@ -32,11 +39,21 @@ export function PropertyMedia({
           backgroundSize: "22px 22px",
         }}
       />
-      <Icon
-        size={iconSize}
-        strokeWidth={1.25}
-        className="relative text-primary-foreground/90"
-      />
+      {src && !failed ? (
+        <img
+          src={src}
+          alt={alt ?? tipo}
+          loading="lazy"
+          onError={() => setFailed(true)}
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+      ) : (
+        <Icon
+          size={iconSize}
+          strokeWidth={1.25}
+          className="relative text-primary-foreground/90"
+        />
+      )}
     </div>
   );
 }
