@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { BedDouble, Bath, Maximize, MapPin } from "lucide-react";
 import type { Property } from "@/data/properties";
 import { formatPrice, propertyTitle } from "@/lib/format";
+import { propertyImage } from "@/lib/propertyImage";
 import { PropertyMedia } from "./PropertyMedia";
 
 export function PropertyCard({ property }: { property: Property }) {
