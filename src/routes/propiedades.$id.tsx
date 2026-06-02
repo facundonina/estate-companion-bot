@@ -107,6 +107,8 @@ function PropertyDetail() {
         <div>
           <PropertyMedia
             tipo={p.tipo}
+            src={propertyImage(p, 1200, 750)}
+            alt={propertyTitle(p.tipo, p.barrio, p.dormitorios)}
             iconSize={96}
             className="aspect-[16/10] w-full rounded-2xl"
           />
