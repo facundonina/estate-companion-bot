@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Send, CheckCircle2 } from "lucide-react";
+import { Send } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import type { Property } from "@/data/properties";
 import { propertyTitle } from "@/lib/format";
+import { PropBot } from "@/components/PropBot";
 
 const leadSchema = z.object({
   nombre: z
