@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Send, CheckCircle2 } from "lucide-react";
+import { Send } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import type { Property } from "@/data/properties";
 import { propertyTitle } from "@/lib/format";
+import { PropBot } from "@/components/PropBot";
 
 const leadSchema = z.object({
   nombre: z
@@ -76,16 +77,15 @@ export function LeadForm({ property }: { property: Property }) {
 
   if (submitted) {
     return (
-      <div className="rounded-2xl border border-primary/30 bg-primary/5 p-6 text-center">
-        <CheckCircle2 className="mx-auto text-primary" size={40} />
-        <h3 className="mt-3 text-lg font-bold text-foreground">
-          ¡Gracias, {form.nombre.split(" ")[0]}!
-        </h3>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Recibimos tu consulta sobre esta propiedad. Nuestro asistente te
-          contactará a la brevedad para coordinar una visita.
-        </p>
-      </div>
+      <PropBot
+        property={property}
+        lead={{
+          nombre: form.nombre,
+          telefono: form.telefono,
+          email: form.email,
+          mensaje: form.mensaje,
+        }}
+      />
     );
   }
 
