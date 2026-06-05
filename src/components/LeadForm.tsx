@@ -77,16 +77,15 @@ export function LeadForm({ property }: { property: Property }) {
 
   if (submitted) {
     return (
-      <div className="rounded-2xl border border-primary/30 bg-primary/5 p-6 text-center">
-        <CheckCircle2 className="mx-auto text-primary" size={40} />
-        <h3 className="mt-3 text-lg font-bold text-foreground">
-          ¡Gracias, {form.nombre.split(" ")[0]}!
-        </h3>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Recibimos tu consulta sobre esta propiedad. Nuestro asistente te
-          contactará a la brevedad para coordinar una visita.
-        </p>
-      </div>
+      <PropBot
+        property={property}
+        lead={{
+          nombre: form.nombre,
+          telefono: form.telefono,
+          email: form.email,
+          mensaje: form.mensaje,
+        }}
+      />
     );
   }
 
