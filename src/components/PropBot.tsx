@@ -313,6 +313,45 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
             const low = text.toLowerCase();
             if (low.includes("piscin")) lead.piscina = true;
             if (low.includes("garage") || low.includes("garaje")) lead.garage = true;
+            stepRef.current = 14;
+            await botReply(
+              {
+                text: "¿Cuándo necesitás concretar?",
+                quickReplies: [
+                  { label: "Menos de 3 meses", value: "Menos de 3 meses" },
+                  { label: "3 a 6 meses", value: "3 a 6 meses" },
+                  { label: "En el año", value: "En el año" },
+                  { label: "Estoy explorando", value: "Estoy explorando" },
+                ],
+              },
+              700,
+            );
+            return;
+          }
+          case 14: {
+            lead.urgencia = text;
+            stepRef.current = 15;
+            await botReply(
+              {
+                text: "¿Cómo pensás financiar la compra?",
+                quickReplies: [
+                  { label: "Efectivo listo", value: "Efectivo listo" },
+                  {
+                    label: "Crédito hipotecario aprobado",
+                    value: "Crédito hipotecario aprobado",
+                  },
+                  { label: "Crédito en trámite", value: "Crédito en trámite" },
+                  { label: "No lo definí todavía", value: "No lo definí todavía" },
+                ],
+              },
+              700,
+            );
+            return;
+          }
+          case 15: {
+            lead.financiamiento = text;
+            lead.prioridad = calcPrioridad(lead);
+            void sendLeadToSheet(lead);
             const top3 = similarProps();
             await botReply(
               {
