@@ -3,7 +3,7 @@ import { Building2, Send, Calendar, Bath, BedDouble, Maximize } from "lucide-rea
 import { properties, type Property } from "@/data/properties";
 import { formatPrice, propertyTitle } from "@/lib/format";
 import { propertyImage } from "@/lib/propertyImage";
-import { sendLeadToSheet } from "@/lib/leadSheet";
+import { sendLeadToSheet } from "@/lib/leadSheet.functions";
 
 export interface BotLead {
   nombre: string;
@@ -352,7 +352,22 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
           case 15: {
             lead.financiamiento = text;
             lead.prioridad = calcPrioridad(lead);
-            void sendLeadToSheet(lead);
+            void sendLeadToSheet({
+              data: {
+                nombre: lead.nombre,
+                telefono: lead.telefono,
+                email: lead.email,
+                mensaje: lead.mensaje,
+                zona: lead.zona,
+                tipo: lead.tipo,
+                dormitorios: lead.dormitorios,
+                presupuesto: lead.presupuesto,
+                proposito: lead.proposito,
+                urgencia: lead.urgencia,
+                financiamiento: lead.financiamiento,
+                prioridad: lead.prioridad,
+              },
+            });
             const top3 = similarProps();
             await botReply(
               {
