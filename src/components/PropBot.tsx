@@ -52,6 +52,23 @@ interface BotLeadState extends BotLead {
   proposito?: string;
   piscina?: boolean;
   garage?: boolean;
+  urgencia?: string;
+  financiamiento?: string;
+  prioridad?: string;
+}
+
+function calcPrioridad(lead: BotLeadState): string {
+  const financiamiento = lead.financiamiento || "";
+  const urgencia = lead.urgencia || "";
+  const tieneDinero =
+    financiamiento === "Efectivo listo" ||
+    financiamiento === "Crédito hipotecario aprobado";
+  const urgenciaAlta = urgencia === "Menos de 3 meses";
+  const urgenciaMedia = urgencia === "3 a 6 meses";
+  if (tieneDinero && urgenciaAlta) return "Alta";
+  if (tieneDinero && urgenciaMedia) return "Media";
+  if (tieneDinero || urgenciaAlta) return "Media";
+  return "Baja";
 }
 
 function buildSlots(): Slot[] {
