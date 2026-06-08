@@ -52,11 +52,13 @@ export const sendLeadToSheet = createServerFn({ method: "POST" })
     }
 
     try {
+      console.log("Enviando lead a Sheets...");
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
+      console.log("Lead enviado");
       return { ok: res.ok as boolean };
     } catch (err) {
       console.error("[leadSheet] No se pudo enviar el lead:", err);
