@@ -353,20 +353,18 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
             lead.financiamiento = text;
             lead.prioridad = calcPrioridad(lead);
             void sendLeadToSheet({
-              data: {
-                nombre: lead.nombre,
-                telefono: lead.telefono,
-                email: lead.email,
-                mensaje: lead.mensaje,
-                zona: lead.zona,
-                tipo: lead.tipo,
-                dormitorios: lead.dormitorios,
-                presupuesto: lead.presupuesto,
-                proposito: lead.proposito,
-                urgencia: lead.urgencia,
-                financiamiento: lead.financiamiento,
-                prioridad: lead.prioridad,
-              },
+              nombre: lead.nombre,
+              telefono: lead.telefono,
+              email: lead.email,
+              mensaje: lead.mensaje,
+              zona: lead.zona,
+              tipo: lead.tipo,
+              dormitorios: lead.dormitorios,
+              presupuesto: lead.presupuesto,
+              proposito: lead.proposito,
+              urgencia: lead.urgencia,
+              financiamiento: lead.financiamiento,
+              prioridad: lead.prioridad,
             });
             const top3 = similarProps();
             await botReply(
