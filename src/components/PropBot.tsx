@@ -3,7 +3,7 @@ import { Building2, Send, Calendar, Bath, BedDouble, Maximize } from "lucide-rea
 import { properties, type Property } from "@/data/properties";
 import { formatPrice, propertyTitle } from "@/lib/format";
 import { propertyImage } from "@/lib/propertyImage";
-import { sendLeadToSheet } from "@/lib/leadSheet.functions";
+import { sendLeadToSheet } from "@/lib/leadSheet";
 
 export interface BotLead {
   nombre: string;
