@@ -442,7 +442,7 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
         }
       }
     },
-    [addMsg, botReply, done, property, similarProps, typing],
+    [addMsg, botReply, done, property, recommendProps, typing],
   );
 
   const confirmSlot = useCallback(async () => {
