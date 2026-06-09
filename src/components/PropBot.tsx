@@ -337,6 +337,53 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
         return;
       }
 
+      if (flowRef.current === "prop") {
+        switch (stepRef.current) {
+          case 2: {
+            lead.urgencia = text;
+            stepRef.current = 3;
+            await botReply(
+              {
+                text: "¿Cómo pensás financiar la compra?",
+                quickReplies: [
+                  { label: "Efectivo listo", value: "Efectivo listo" },
+                  {
+                    label: "Crédito hipotecario aprobado",
+                    value: "Crédito hipotecario aprobado",
+                  },
+                  { label: "Crédito en trámite", value: "Crédito en trámite" },
+                  { label: "No lo definí todavía", value: "No lo definí todavía" },
+                ],
+              },
+              700,
+            );
+            return;
+          }
+          case 3: {
+            lead.financiamiento = text;
+            lead.prioridad = calcPrioridad(lead);
+            void sendLeadToSheet({
+              nombre: lead.nombre,
+              telefono: lead.telefono,
+              email: lead.email,
+              mensaje: lead.mensaje,
+              zona: lead.zona,
+              tipo: lead.tipo,
+              proposito: lead.proposito,
+              urgencia: lead.urgencia,
+              financiamiento: lead.financiamiento,
+              prioridad: lead.prioridad,
+            });
+            stepRef.current = 4;
+            await presentAgenda(
+              "¡Gracias! Podemos coordinar una visita para que la conozcas en persona. Elegí uno de los horarios disponibles:",
+            );
+            return;
+          }
+        }
+      }
+
+
       if (flowRef.current === "similar") {
         switch (stepRef.current) {
           case 10: {
