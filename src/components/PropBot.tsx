@@ -38,6 +38,21 @@ function firstName(n: string) {
   return (n || "").split(" ")[0] || "";
 }
 
+// Opciones válidas para cada pregunta de calificación. Si el usuario
+// responde algo que no corresponde, le pedimos que lo intente de nuevo.
+const URGENCIA_OPCIONES = [
+  "Menos de 3 meses",
+  "3 a 6 meses",
+  "En el año",
+  "Estoy explorando",
+];
+const FINANCIAMIENTO_OPCIONES = [
+  "Efectivo listo",
+  "Crédito hipotecario aprobado",
+  "Crédito en trámite",
+  "No lo definí todavía",
+];
+
 function scoreProp(p: Property, lead: BotLeadState): number {
   let s = 0;
   if (lead.zona && p.zona.toLowerCase().includes(lead.zona.toLowerCase())) s += 4;
@@ -247,6 +262,9 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
   // cambiar si elige "Me interesa también" sobre una recomendación).
   const activePropRef = useRef<Property>(property);
   const offeredRecRef = useRef(false);
+  // Horario ya confirmado para la reunión. Si el lead suma otra propiedad
+  // con "Me interesa también", la coordinamos en este mismo horario.
+  const confirmedSlotRef = useRef<Slot | null>(null);
   const idRef = useRef(0);
   const scrollRef = useRef<HTMLDivElement>(null);
   const startedRef = useRef(false);
@@ -395,6 +413,15 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
 
       switch (stepRef.current) {
         case 2: {
+          if (!URGENCIA_OPCIONES.includes(text)) {
+            await botReply(
+              {
+                text: "No pude entender tu respuesta 🤔. Elegí una de las opciones para contarme cuándo necesitás concretar la compra.",
+              },
+              600,
+            );
+            return;
+          }
           lead.urgencia = text;
           stepRef.current = 3;
           await botReply(
@@ -415,6 +442,15 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
           return;
         }
         case 3: {
+          if (!FINANCIAMIENTO_OPCIONES.includes(text)) {
+            await botReply(
+              {
+                text: "No pude entender tu respuesta 🤔. Elegí una de las opciones para contarme cómo pensás financiar la compra.",
+              },
+              600,
+            );
+            return;
+          }
           lead.financiamiento = text;
           stepRef.current = 5;
           await botReply(
@@ -512,6 +548,7 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
       });
       setTyping(false);
       setSlotConfirmed(true);
+      confirmedSlotRef.current = selectedSlot;
       addMsg({
         role: "bot",
         text: `¡Listo! Tu visita quedó confirmada para el ${selectedSlot.label} a las ${selectedSlot.time}. Vas a recibir la confirmación por email${
@@ -549,8 +586,7 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
   }, [addMsg, botReply, confirming, recommendProps, selectedSlot, slotConfirmed]);
 
   // El usuario eligió "Me interesa también" sobre una recomendación.
-  // Reutilizamos sus datos ya recolectados: enviamos el lead con la nueva
-  // propiedad y volvemos a abrir la agenda, sin repetir las preguntas.
+  // Reutilizamos sus datos ya recolectados (no volvemos a preguntar).
   const expressInterest = useCallback(
     async (p: Property) => {
       if (typing || confirming) return;
@@ -559,18 +595,34 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
         text: `Me interesa también: ${p.tipo} en ${p.barrio}`,
       });
       activePropRef.current = p;
+      void sendLeadToSheet(leadPayload(leadRef.current, p));
+
+      // Si ya hay un horario confirmado, sumamos esta propiedad a la MISMA
+      // reunión: es un único encuentro con el asesor, así que no pedimos
+      // otro horario.
+      const slot = confirmedSlotRef.current;
+      if (slot) {
+        await botReply(
+          {
+            text: `¡Genial! Sumamos ${p.tipo} en ${p.barrio} a la misma reunión del ${slot.label} a las ${slot.time}. El asesor te va a mostrar todas las opciones en ese mismo encuentro. ¡Nos vemos!`,
+          },
+          900,
+        );
+        return;
+      }
+
+      // Si todavía no hay horario confirmado, abrimos la agenda.
       setSelectedSlot(null);
       setSlotConfirmed(false);
       setConfirming(false);
       setDone(false);
       setNotQualified(false);
-      void sendLeadToSheet(leadPayload(leadRef.current, p));
       stepRef.current = 4;
       await presentAgenda(
-        `¡Genial! Coordinemos también una visita para ${p.tipo} en ${p.barrio}. Elegí uno de los horarios disponibles:`,
+        `¡Genial! Coordinemos una visita para ${p.tipo} en ${p.barrio}. Elegí uno de los horarios disponibles:`,
       );
     },
-    [addMsg, confirming, presentAgenda, typing],
+    [addMsg, botReply, confirming, presentAgenda, typing],
   );
 
 
