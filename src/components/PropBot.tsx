@@ -243,7 +243,10 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
 
   const leadRef = useRef<BotLeadState>({ ...lead });
   const stepRef = useRef(0);
-  const flowRef = useRef<"prop" | "similar">("prop");
+  // Propiedad por la que el lead muestra interés en este momento (puede
+  // cambiar si elige "Me interesa también" sobre una recomendación).
+  const activePropRef = useRef<Property>(property);
+  const offeredRecRef = useRef(false);
   const idRef = useRef(0);
   const scrollRef = useRef<HTMLDivElement>(null);
   const startedRef = useRef(false);
