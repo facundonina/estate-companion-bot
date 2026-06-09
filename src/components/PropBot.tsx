@@ -580,11 +580,15 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
                   </div>
                   <button
                     type="button"
-                    disabled={!selectedSlot || slotConfirmed}
+                    disabled={!selectedSlot || slotConfirmed || confirming}
                     onClick={confirmSlot}
                     className="mt-2 w-full rounded-md bg-primary py-2 text-[13px] font-semibold text-primary-foreground transition-opacity disabled:opacity-40"
                   >
-                    {slotConfirmed ? "Visita confirmada" : "Confirmar visita"}
+                    {slotConfirmed
+                      ? "Visita confirmada"
+                      : confirming
+                        ? "Confirmando..."
+                        : "Confirmar visita"}
                   </button>
                 </div>
               )}
