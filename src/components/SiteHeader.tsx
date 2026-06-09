@@ -35,12 +35,6 @@ export function SiteHeader() {
           >
             Propiedades
           </Link>
-          <Link
-            to="/propiedades"
-            className="rounded-lg bg-primary px-4 py-2 text-primary-foreground transition-colors hover:bg-primary/90"
-          >
-            Ver propiedades
-          </Link>
         </nav>
       </div>
     </header>
