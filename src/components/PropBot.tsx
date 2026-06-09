@@ -439,6 +439,15 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
           return;
         }
         case 3: {
+          if (!FINANCIAMIENTO_OPCIONES.includes(text)) {
+            await botReply(
+              {
+                text: "No pude entender tu respuesta 🤔. Elegí una de las opciones para contarme cómo pensás financiar la compra.",
+              },
+              600,
+            );
+            return;
+          }
           lead.financiamiento = text;
           stepRef.current = 5;
           await botReply(
