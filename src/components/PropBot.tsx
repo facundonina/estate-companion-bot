@@ -193,11 +193,38 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
     }
   }, [messages, typing]);
 
-  const similarProps = useCallback(() => {
-    return [...properties]
-      .filter((x) => x.id !== property.id)
-      .sort((a, b) => scoreProp(b, leadRef.current) - scoreProp(a, leadRef.current))
-      .slice(0, 3);
+  const recommendProps = useCallback((): { cards: Property[]; expanded: boolean } => {
+    const lead = leadRef.current;
+    const pool = properties.filter((x) => x.id !== property.id);
+
+    const tipoOk = (p: Property) => !lead.tipo || p.tipo === lead.tipo;
+    // El presupuesto no puede ser menor al 60% del precio de la propiedad.
+    const budgetOk = (p: Property) =>
+      !lead.presupuesto || lead.presupuesto >= p.precio * 0.6;
+    const sortTop = (arr: Property[]) =>
+      [...arr].sort((a, b) => scoreProp(b, lead) - scoreProp(a, lead));
+
+    // Paso 1: zona exacta + filtros duros (tipo + presupuesto).
+    let expanded = false;
+    let scope = pool.filter((p) => p.zona === lead.zona);
+    let filtered = scope.filter((p) => tipoOk(p) && budgetOk(p));
+
+    // Paso 2: si hay menos de 3, expandir a zonas relacionadas.
+    if (filtered.length < 3) {
+      expanded = true;
+      scope = pool.filter(
+        (p) => p.zona === lead.zona || isRelatedZona(p, lead.zona),
+      );
+      filtered = scope.filter((p) => tipoOk(p) && budgetOk(p));
+    }
+
+    // Paso 3: si aún hay menos de 3, completar sin filtro de precio
+    // pero manteniendo siempre la zona (scope) y el tipo.
+    if (filtered.length < 3) {
+      filtered = scope.filter((p) => tipoOk(p));
+    }
+
+    return { cards: sortTop(filtered).slice(0, 3), expanded };
   }, [property.id]);
 
   // Kick off the conversation once.
