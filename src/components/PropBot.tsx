@@ -190,6 +190,7 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
   const [slotConfirmed, setSlotConfirmed] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [availableSlots, setAvailableSlots] = useState<CalendarSlot[]>([]);
+  const [notQualified, setNotQualified] = useState(false);
 
   const leadRef = useRef<BotLeadState>({ ...lead });
   const stepRef = useRef(0);
