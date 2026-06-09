@@ -105,6 +105,28 @@ function calcPrioridad(lead: BotLeadState): string {
   return "Baja";
 }
 
+// Interpreta el presupuesto escrito a mano por el usuario y lo convierte
+// a un número en dólares. Soporta formatos como "90.000", "USD 120.000",
+// "80k", "100 mil", "1.8 millones", "1,8M", etc.
+function parseBudget(raw: string): number | null {
+  const t = raw.toLowerCase().trim();
+  const m = t.match(/([\d][\d.,]*)\s*(millones|mill[oó]n|mm|m|mil|k)?/);
+  if (!m) return null;
+  const numRaw = m[1];
+  const suf = m[2] || "";
+  let value: number;
+  if (suf === "mil" || suf === "k") {
+    value = parseFloat(numRaw.replace(/[.,]/g, "")) * 1000;
+  } else if (suf) {
+    // millones / m / mm
+    value = parseFloat(numRaw.replace(",", ".")) * 1_000_000;
+  } else {
+    value = parseFloat(numRaw.replace(/[.,]/g, ""));
+  }
+  if (!Number.isFinite(value) || value <= 0) return null;
+  return Math.round(value);
+}
+
 // Evalúa si el lead realmente califica para ESTA propiedad puntual.
 // Devuelve los motivos por los que NO calificaría (vacío = califica).
 function qualifyForProperty(
@@ -256,30 +278,35 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
     const pool = properties.filter((x) => x.id !== property.id);
 
     const tipoOk = (p: Property) => !lead.tipo || p.tipo === lead.tipo;
-    // El presupuesto no puede ser menor al 60% del precio de la propiedad.
+    // El precio no puede superar el presupuesto del usuario (con un margen
+    // chico del 10%). Nunca recomendamos propiedades fuera de su alcance.
     const budgetOk = (p: Property) =>
-      !lead.presupuesto || lead.presupuesto >= p.precio * 0.6;
+      !lead.presupuesto || p.precio <= lead.presupuesto * 1.1;
     const sortTop = (arr: Property[]) =>
       [...arr].sort((a, b) => scoreProp(b, lead) - scoreProp(a, lead));
 
     // Paso 1: zona exacta + filtros duros (tipo + presupuesto).
     let expanded = false;
-    let scope = pool.filter((p) => p.zona === lead.zona);
-    let filtered = scope.filter((p) => tipoOk(p) && budgetOk(p));
+    let filtered = pool.filter(
+      (p) => p.zona === lead.zona && tipoOk(p) && budgetOk(p),
+    );
 
     // Paso 2: si hay menos de 3, expandir a zonas relacionadas.
     if (filtered.length < 3) {
       expanded = true;
-      scope = pool.filter(
-        (p) => p.zona === lead.zona || isRelatedZona(p, lead.zona),
+      filtered = pool.filter(
+        (p) =>
+          (p.zona === lead.zona || isRelatedZona(p, lead.zona)) &&
+          tipoOk(p) &&
+          budgetOk(p),
       );
-      filtered = scope.filter((p) => tipoOk(p) && budgetOk(p));
     }
 
-    // Paso 3: si aún hay menos de 3, completar sin filtro de precio
-    // pero manteniendo siempre la zona (scope) y el tipo.
+    // Paso 3: si aún hay menos de 3, relajar el tipo pero SIEMPRE
+    // respetando el presupuesto. Nunca mostramos propiedades fuera de él.
     if (filtered.length < 3) {
-      filtered = scope.filter((p) => tipoOk(p));
+      expanded = true;
+      filtered = pool.filter((p) => budgetOk(p));
     }
 
     return { cards: sortTop(filtered).slice(0, 3), expanded };
@@ -398,26 +425,24 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
             stepRef.current = 5;
             await botReply(
               {
-                text: "Por último, ¿cuál es tu presupuesto aproximado para esta compra?",
-                quickReplies: [
-                  { label: "Hasta USD 80K", value: "Hasta USD 80K" },
-                  { label: "USD 80K – 150K", value: "USD 80K – 150K" },
-                  { label: "USD 150K – 300K", value: "USD 150K – 300K" },
-                  { label: "Más de USD 300K", value: "Más de USD 300K" },
-                ],
+                text: "Por último, ¿cuál es tu presupuesto aproximado para esta compra? Escribilo en dólares (por ejemplo: 90.000 o USD 120.000).",
               },
               700,
             );
             return;
           }
           case 5: {
-            const m: Record<string, number> = {
-              "Hasta USD 80K": 65000,
-              "USD 80K – 150K": 115000,
-              "USD 150K – 300K": 225000,
-              "Más de USD 300K": 400000,
-            };
-            lead.presupuesto = m[text] || 115000;
+            const presupuesto = parseBudget(text);
+            if (presupuesto === null) {
+              await botReply(
+                {
+                  text: "No pude entender ese monto 🤔. Escribí tu presupuesto en dólares, por ejemplo: 90.000 o USD 120.000.",
+                },
+                600,
+              );
+              return;
+            }
+            lead.presupuesto = presupuesto;
             lead.prioridad = calcPrioridad(lead);
 
             const { ok, reasons } = qualifyForProperty(property, lead);
@@ -443,15 +468,24 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
                   },
                   900,
                 );
+                await new Promise((r) => setTimeout(r, 300));
+                await botReply(
+                  {
+                    text: "Te invito a verlas en detalle y elegir la que más te guste 👇",
+                    cta: { label: "Ver propiedades disponibles" },
+                  },
+                  600,
+                );
+              } else {
+                await new Promise((r) => setTimeout(r, 400));
+                await botReply(
+                  {
+                    text: "Por ahora no tenemos propiedades que se ajusten a tu presupuesto y a lo que estás buscando. De todos modos, te invito a recorrer todo nuestro catálogo por si encontrás algo que te guste 👇",
+                    cta: { label: "Ver propiedades disponibles" },
+                  },
+                  900,
+                );
               }
-              await new Promise((r) => setTimeout(r, 300));
-              await botReply(
-                {
-                  text: "Te invito a verlas en detalle y elegir la que más te guste 👇",
-                  cta: { label: "Ver propiedades disponibles" },
-                },
-                600,
-              );
               setNotQualified(true);
               return;
             }
@@ -493,26 +527,24 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
             stepRef.current = 11;
             await botReply(
               {
-                text: "¿Cuál sería tu presupuesto aproximado?",
-                quickReplies: [
-                  { label: "Hasta USD 80K", value: "Hasta USD 80K" },
-                  { label: "USD 80K – 150K", value: "USD 80K – 150K" },
-                  { label: "USD 150K – 300K", value: "USD 150K – 300K" },
-                  { label: "Más de USD 300K", value: "Más de USD 300K" },
-                ],
+                text: "¿Cuál sería tu presupuesto aproximado? Escribilo en dólares (por ejemplo: 90.000 o USD 120.000).",
               },
               700,
             );
             return;
           }
           case 11: {
-            const m: Record<string, number> = {
-              "Hasta USD 80K": 65000,
-              "USD 80K – 150K": 115000,
-              "USD 150K – 300K": 225000,
-              "Más de USD 300K": 400000,
-            };
-            lead.presupuesto = m[text] || 115000;
+            const presupuesto = parseBudget(text);
+            if (presupuesto === null) {
+              await botReply(
+                {
+                  text: "No pude entender ese monto 🤔. Escribí tu presupuesto en dólares, por ejemplo: 90.000 o USD 120.000.",
+                },
+                600,
+              );
+              return;
+            }
+            lead.presupuesto = presupuesto;
             stepRef.current = 12;
             await botReply(
               {
@@ -580,6 +612,23 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
           case 15: {
             lead.financiamiento = text;
             lead.prioridad = calcPrioridad(lead);
+
+            const { cards: top3, expanded } = recommendProps();
+
+            // Sin opciones dentro del presupuesto: no entregamos el lead,
+            // solo invitamos a recorrer el catálogo.
+            if (top3.length === 0) {
+              await botReply(
+                {
+                  text: "Por ahora no tenemos propiedades que se ajusten a tu presupuesto y a lo que estás buscando. De todos modos, te invito a recorrer todo nuestro catálogo por si encontrás algo que te guste 👇",
+                  cta: { label: "Ver propiedades disponibles" },
+                },
+                1000,
+              );
+              setNotQualified(true);
+              return;
+            }
+
             void sendLeadToSheet({
               nombre: lead.nombre,
               telefono: lead.telefono,
@@ -594,7 +643,6 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
               financiamiento: lead.financiamiento,
               prioridad: lead.prioridad,
             });
-            const { cards: top3, expanded } = recommendProps();
             await botReply(
               {
                 text: expanded
