@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Building2, Send, Calendar, Bath, BedDouble, Maximize } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { Building2, Send, Calendar, Bath, BedDouble, Maximize, ArrowRight } from "lucide-react";
 import { properties, type Property } from "@/data/properties";
 import { formatPrice } from "@/lib/format";
 import { propertyImage } from "@/lib/propertyImage";
@@ -29,6 +30,7 @@ interface BotMessage {
   cards?: Property[];
   agenda?: boolean;
   quickReplies?: QuickReply[];
+  cta?: { label: string };
 }
 
 function firstName(n: string) {
