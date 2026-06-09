@@ -7,7 +7,6 @@ import {
   Calendar,
   Building,
   ArrowLeft,
-  MessageCircle,
   Check,
   Phone,
 } from "lucide-react";
