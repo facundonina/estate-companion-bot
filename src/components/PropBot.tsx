@@ -612,6 +612,23 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
           case 15: {
             lead.financiamiento = text;
             lead.prioridad = calcPrioridad(lead);
+
+            const { cards: top3, expanded } = recommendProps();
+
+            // Sin opciones dentro del presupuesto: no entregamos el lead,
+            // solo invitamos a recorrer el catálogo.
+            if (top3.length === 0) {
+              await botReply(
+                {
+                  text: "Por ahora no tenemos propiedades que se ajusten a tu presupuesto y a lo que estás buscando. De todos modos, te invito a recorrer todo nuestro catálogo por si encontrás algo que te guste 👇",
+                  cta: { label: "Ver propiedades disponibles" },
+                },
+                1000,
+              );
+              setNotQualified(true);
+              return;
+            }
+
             void sendLeadToSheet({
               nombre: lead.nombre,
               telefono: lead.telefono,
@@ -626,7 +643,6 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
               financiamiento: lead.financiamiento,
               prioridad: lead.prioridad,
             });
-            const { cards: top3, expanded } = recommendProps();
             await botReply(
               {
                 text: expanded
