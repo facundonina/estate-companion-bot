@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Building2, Send, Calendar, Bath, BedDouble, Maximize } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { Building2, Send, Calendar, Bath, BedDouble, Maximize, ArrowRight } from "lucide-react";
 import { properties, type Property } from "@/data/properties";
 import { formatPrice } from "@/lib/format";
 import { propertyImage } from "@/lib/propertyImage";
@@ -29,6 +30,7 @@ interface BotMessage {
   cards?: Property[];
   agenda?: boolean;
   quickReplies?: QuickReply[];
+  cta?: { label: string };
 }
 
 function firstName(n: string) {
@@ -103,6 +105,37 @@ function calcPrioridad(lead: BotLeadState): string {
   return "Baja";
 }
 
+// Evalúa si el lead realmente califica para ESTA propiedad puntual.
+// Devuelve los motivos por los que NO calificaría (vacío = califica).
+function qualifyForProperty(
+  p: Property,
+  lead: BotLeadState,
+): { ok: boolean; reasons: string[] } {
+  const reasons: string[] = [];
+
+  // Estado de obra vs. urgencia de mudanza.
+  const enObra = p.estado === "En construcción" || p.estado === "En pozo";
+  if (enObra && lead.urgencia === "Menos de 3 meses") {
+    reasons.push(
+      `esta propiedad está en estado "${p.estado}", así que no estaría lista para mudarte en menos de 3 meses`,
+    );
+  }
+
+  // Presupuesto vs. precio: no puede ser menor al 60% del valor.
+  if (lead.presupuesto && lead.presupuesto < p.precio * 0.6) {
+    reasons.push(
+      `tu presupuesto queda bastante por debajo del precio de esta propiedad (${formatPrice(
+        p.precio,
+        p.moneda,
+      )})`,
+    );
+  }
+
+  return { ok: reasons.length === 0, reasons };
+}
+
+
+
 
 
 function PropertyCardBubble({ p }: { p: Property }) {
@@ -157,6 +190,7 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
   const [slotConfirmed, setSlotConfirmed] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [availableSlots, setAvailableSlots] = useState<CalendarSlot[]>([]);
+  const [notQualified, setNotQualified] = useState(false);
 
   const leadRef = useRef<BotLeadState>({ ...lead });
   const stepRef = useRef(0);
@@ -361,7 +395,68 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
           }
           case 3: {
             lead.financiamiento = text;
+            stepRef.current = 5;
+            await botReply(
+              {
+                text: "Por último, ¿cuál es tu presupuesto aproximado para esta compra?",
+                quickReplies: [
+                  { label: "Hasta USD 80K", value: "Hasta USD 80K" },
+                  { label: "USD 80K – 150K", value: "USD 80K – 150K" },
+                  { label: "USD 150K – 300K", value: "USD 150K – 300K" },
+                  { label: "Más de USD 300K", value: "Más de USD 300K" },
+                ],
+              },
+              700,
+            );
+            return;
+          }
+          case 5: {
+            const m: Record<string, number> = {
+              "Hasta USD 80K": 65000,
+              "USD 80K – 150K": 115000,
+              "USD 150K – 300K": 225000,
+              "Más de USD 300K": 400000,
+            };
+            lead.presupuesto = m[text] || 115000;
             lead.prioridad = calcPrioridad(lead);
+
+            const { ok, reasons } = qualifyForProperty(property, lead);
+
+            // No califica para esta propiedad: NO entregamos el lead.
+            // Lo derivamos a ver opciones que sí encajan.
+            if (!ok) {
+              const { cards } = recommendProps();
+              await botReply(
+                {
+                  text: `Gracias por contarme. Mirando lo que necesitás, ${reasons.join(
+                    " y ",
+                  )}. Por eso esta propiedad no sería la mejor opción para vos.`,
+                },
+                1000,
+              );
+              if (cards.length > 0) {
+                await new Promise((r) => setTimeout(r, 400));
+                await botReply(
+                  {
+                    text: "Con tus preferencias, estas opciones sí encajan mejor:",
+                    cards,
+                  },
+                  900,
+                );
+              }
+              await new Promise((r) => setTimeout(r, 300));
+              await botReply(
+                {
+                  text: "Te invito a verlas en detalle y elegir la que más te guste 👇",
+                  cta: { label: "Ver propiedades disponibles" },
+                },
+                600,
+              );
+              setNotQualified(true);
+              return;
+            }
+
+            // Califica: entregamos el lead y coordinamos la visita.
             void sendLeadToSheet({
               nombre: lead.nombre,
               telefono: lead.telefono,
@@ -369,6 +464,7 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
               mensaje: lead.mensaje,
               zona: lead.zona,
               tipo: lead.tipo,
+              presupuesto: lead.presupuesto,
               proposito: lead.proposito,
               urgencia: lead.urgencia,
               financiamiento: lead.financiamiento,
@@ -611,6 +707,14 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
                   ))}
                 </div>
               )}
+              {m.cta && (
+                <Link
+                  to="/propiedades"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-[13px] font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+                >
+                  {m.cta.label} <ArrowRight size={14} />
+                </Link>
+              )}
               {m.agenda && (
                 <div className="w-full max-w-[280px] rounded-xl border border-border bg-card p-3">
                   <p className="mb-2 flex items-center gap-1.5 text-[13px] font-semibold text-foreground">
@@ -691,6 +795,18 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
           </p>
           <p className="mt-0.5 text-[12px] text-muted-foreground">
             Esta conversación quedó cerrada. ¡Nos vemos en la visita!
+          </p>
+        </div>
+      ) : notQualified ? (
+        <div className="border-t border-border p-3.5 text-center">
+          <Link
+            to="/propiedades"
+            className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-[13px] font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+          >
+            Ver propiedades disponibles <ArrowRight size={14} />
+          </Link>
+          <p className="mt-2 text-[12px] text-muted-foreground">
+            Explorá las opciones que mejor se ajustan a vos.
           </p>
         </div>
       ) : (
