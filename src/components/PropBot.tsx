@@ -305,7 +305,7 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
 
   const recommendProps = useCallback((): { cards: Property[]; expanded: boolean } => {
     const lead = leadRef.current;
-    const pool = properties.filter((x) => x.id !== property.id);
+    const pool = properties.filter((x) => x.id !== activePropRef.current.id);
 
     const tipoOk = (p: Property) => !lead.tipo || p.tipo === lead.tipo;
     // El precio no puede superar el presupuesto del usuario (con un margen
@@ -340,7 +340,7 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
     }
 
     return { cards: sortTop(filtered).slice(0, 3), expanded };
-  }, [property.id]);
+  }, []);
 
   // Kick off the conversation once.
   useEffect(() => {
