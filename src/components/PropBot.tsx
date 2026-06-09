@@ -105,6 +105,37 @@ function calcPrioridad(lead: BotLeadState): string {
   return "Baja";
 }
 
+// Evalúa si el lead realmente califica para ESTA propiedad puntual.
+// Devuelve los motivos por los que NO calificaría (vacío = califica).
+function qualifyForProperty(
+  p: Property,
+  lead: BotLeadState,
+): { ok: boolean; reasons: string[] } {
+  const reasons: string[] = [];
+
+  // Estado de obra vs. urgencia de mudanza.
+  const enObra = p.estado === "En construcción" || p.estado === "En pozo";
+  if (enObra && lead.urgencia === "Menos de 3 meses") {
+    reasons.push(
+      `esta propiedad está en estado "${p.estado}", así que no estaría lista para mudarte en menos de 3 meses`,
+    );
+  }
+
+  // Presupuesto vs. precio: no puede ser menor al 60% del valor.
+  if (lead.presupuesto && lead.presupuesto < p.precio * 0.6) {
+    reasons.push(
+      `tu presupuesto queda bastante por debajo del precio de esta propiedad (${formatPrice(
+        p.precio,
+        p.moneda,
+      )})`,
+    );
+  }
+
+  return { ok: reasons.length === 0, reasons };
+}
+
+
+
 
 
 function PropertyCardBubble({ p }: { p: Property }) {
