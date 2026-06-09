@@ -300,12 +300,8 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
 
       if (flowRef.current === "prop" && stepRef.current === 1) {
         if (text === "esta") {
-          await botReply(
-            {
-              text: "¡Genial! Podemos coordinar una visita para que la conozcas en persona. Elegí un horario que te venga bien:",
-              agenda: true,
-            },
-            800,
+          await presentAgenda(
+            "¡Genial! Podemos coordinar una visita para que la conozcas en persona. Elegí uno de los horarios disponibles:",
           );
           stepRef.current = 2;
         } else {
