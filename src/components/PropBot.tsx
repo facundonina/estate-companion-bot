@@ -450,38 +450,59 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
               1000,
             );
             await new Promise((r) => setTimeout(r, 400));
-            await botReply(
-              {
-                text: "Si alguna te interesa, podemos coordinar una visita. Un asesor también se va a contactar con vos para acompañarte. ¡Gracias!",
-              },
-              700,
+            stepRef.current = 16;
+            await presentAgenda(
+              "Si alguna te interesa, podemos coordinar una visita. Elegí uno de los horarios disponibles:",
             );
-            setDone(true);
             return;
           }
         }
       }
     },
-    [addMsg, botReply, done, property, recommendProps, typing],
+    [addMsg, botReply, done, presentAgenda, property, recommendProps, typing],
   );
 
   const confirmSlot = useCallback(async () => {
-    if (!selectedSlot || slotConfirmed) return;
-    setSlotConfirmed(true);
+    if (!selectedSlot || slotConfirmed || confirming) return;
+    setConfirming(true);
     addMsg({
       role: "user",
       text: `Confirmo la visita para el ${selectedSlot.label} a las ${selectedSlot.time}`,
     });
-    await botReply(
-      {
-        text: `¡Listo! Tu visita quedó agendada para el ${selectedSlot.label} a las ${selectedSlot.time}. Te confirmamos por email a ${leadRef.current.email || "tu correo"}. Si necesitás reprogramar, avisanos. ¡Hasta pronto!`,
-      },
-      1000,
-    );
-    setDone(true);
-  }, [addMsg, botReply, selectedSlot, slotConfirmed]);
+    setTyping(true);
+    try {
+      await createCalendarEvent({
+        data: {
+          startISO: selectedSlot.startISO,
+          endISO: selectedSlot.endISO,
+          cliente: leadRef.current.nombre || "Cliente",
+          zona: leadRef.current.zona,
+          tipo: leadRef.current.tipo,
+          propiedad: propertyTitle(property),
+          email: leadRef.current.email,
+        },
+      });
+      setTyping(false);
+      setSlotConfirmed(true);
+      addMsg({
+        role: "bot",
+        text: `¡Listo! Tu visita quedó confirmada para el ${selectedSlot.label} a las ${selectedSlot.time}. Vas a recibir la confirmación por email${
+          leadRef.current.email ? ` a ${leadRef.current.email}` : ""
+        }. ¡Hasta pronto!`,
+      });
+      setDone(true);
+    } catch (err) {
+      console.error("[calendar] No se pudo crear el evento:", err);
+      setTyping(false);
+      setConfirming(false);
+      addMsg({
+        role: "bot",
+        text: "Tuve un problema al confirmar la visita. Probá con otro horario o un asesor se va a contactar con vos para coordinarla.",
+      });
+    }
+  }, [addMsg, confirming, property, selectedSlot, slotConfirmed]);
 
-  const slots = useRef<Slot[]>(buildSlots());
+
 
   return (
     <div className="flex h-[560px] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-card">
