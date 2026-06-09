@@ -38,6 +38,21 @@ function firstName(n: string) {
   return (n || "").split(" ")[0] || "";
 }
 
+// Opciones válidas para cada pregunta de calificación. Si el usuario
+// responde algo que no corresponde, le pedimos que lo intente de nuevo.
+const URGENCIA_OPCIONES = [
+  "Menos de 3 meses",
+  "3 a 6 meses",
+  "En el año",
+  "Estoy explorando",
+];
+const FINANCIAMIENTO_OPCIONES = [
+  "Efectivo listo",
+  "Crédito hipotecario aprobado",
+  "Crédito en trámite",
+  "No lo definí todavía",
+];
+
 function scoreProp(p: Property, lead: BotLeadState): number {
   let s = 0;
   if (lead.zona && p.zona.toLowerCase().includes(lead.zona.toLowerCase())) s += 4;
