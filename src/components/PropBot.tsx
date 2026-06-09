@@ -19,7 +19,7 @@ export interface BotLead {
 
 type QuickReply = { label: string; value: string };
 
-type Slot = { label: string; time: string; id: string };
+type Slot = CalendarSlot;
 
 interface BotMessage {
   id: number;
