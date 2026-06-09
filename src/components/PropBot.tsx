@@ -58,6 +58,32 @@ interface BotLeadState extends BotLead {
   prioridad?: string;
 }
 
+// Mapa zona -> departamento, derivado de los datos reales.
+const ZONA_DEPT = new Map(properties.map((p) => [p.zona, p.departamento]));
+
+// Departamentos del "interior" que se consideran cercanos entre sí.
+const INTERIOR_DEPTS = ["Salto", "Paysandú", "Rivera", "Durazno"];
+
+// Dado el departamento de la zona elegida, devuelve los departamentos
+// considerados "cercanos" para expandir la búsqueda.
+function relatedDepts(dept?: string): string[] {
+  if (!dept) return [];
+  if (dept === "Montevideo") return ["Montevideo"];
+  if (dept === "Maldonado") return ["Maldonado"];
+  if (dept === "Canelones") return ["Canelones"];
+  if (dept === "Rocha") return ["Rocha"];
+  if (INTERIOR_DEPTS.includes(dept)) return INTERIOR_DEPTS;
+  return [];
+}
+
+// Una propiedad es "cercana" si está en un departamento relacionado con la
+// zona elegida, pero no es exactamente la misma zona.
+function isRelatedZona(p: Property, chosenZona?: string): boolean {
+  if (!chosenZona) return false;
+  const depts = relatedDepts(ZONA_DEPT.get(chosenZona));
+  return depts.includes(p.departamento) && p.zona !== chosenZona;
+}
+
 function calcPrioridad(lead: BotLeadState): string {
   const financiamiento = lead.financiamiento || "";
   const urgencia = lead.urgencia || "";
@@ -167,11 +193,38 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
     }
   }, [messages, typing]);
 
-  const similarProps = useCallback(() => {
-    return [...properties]
-      .filter((x) => x.id !== property.id)
-      .sort((a, b) => scoreProp(b, leadRef.current) - scoreProp(a, leadRef.current))
-      .slice(0, 3);
+  const recommendProps = useCallback((): { cards: Property[]; expanded: boolean } => {
+    const lead = leadRef.current;
+    const pool = properties.filter((x) => x.id !== property.id);
+
+    const tipoOk = (p: Property) => !lead.tipo || p.tipo === lead.tipo;
+    // El presupuesto no puede ser menor al 60% del precio de la propiedad.
+    const budgetOk = (p: Property) =>
+      !lead.presupuesto || lead.presupuesto >= p.precio * 0.6;
+    const sortTop = (arr: Property[]) =>
+      [...arr].sort((a, b) => scoreProp(b, lead) - scoreProp(a, lead));
+
+    // Paso 1: zona exacta + filtros duros (tipo + presupuesto).
+    let expanded = false;
+    let scope = pool.filter((p) => p.zona === lead.zona);
+    let filtered = scope.filter((p) => tipoOk(p) && budgetOk(p));
+
+    // Paso 2: si hay menos de 3, expandir a zonas relacionadas.
+    if (filtered.length < 3) {
+      expanded = true;
+      scope = pool.filter(
+        (p) => p.zona === lead.zona || isRelatedZona(p, lead.zona),
+      );
+      filtered = scope.filter((p) => tipoOk(p) && budgetOk(p));
+    }
+
+    // Paso 3: si aún hay menos de 3, completar sin filtro de precio
+    // pero manteniendo siempre la zona (scope) y el tipo.
+    if (filtered.length < 3) {
+      filtered = scope.filter((p) => tipoOk(p));
+    }
+
+    return { cards: sortTop(filtered).slice(0, 3), expanded };
   }, [property.id]);
 
   // Kick off the conversation once.
@@ -366,10 +419,12 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
               financiamiento: lead.financiamiento,
               prioridad: lead.prioridad,
             });
-            const top3 = similarProps();
+            const { cards: top3, expanded } = recommendProps();
             await botReply(
               {
-                text: "Estas son las opciones que mejor se ajustan a lo que buscás:",
+                text: expanded
+                  ? `No encontré propiedades exactas en ${lead.zona}, pero estas opciones cercanas pueden interesarte:`
+                  : "Estas son las opciones que mejor se ajustan a lo que buscás:",
                 cards: top3,
               },
               1000,
@@ -387,7 +442,7 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
         }
       }
     },
-    [addMsg, botReply, done, property, similarProps, typing],
+    [addMsg, botReply, done, property, recommendProps, typing],
   );
 
   const confirmSlot = useCallback(async () => {
