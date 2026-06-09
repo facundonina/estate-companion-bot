@@ -491,6 +491,7 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
 
   const confirmSlot = useCallback(async () => {
     if (!selectedSlot || slotConfirmed || confirming) return;
+    const activeProp = activePropRef.current;
     setConfirming(true);
     addMsg({
       role: "user",
@@ -505,7 +506,7 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
           cliente: leadRef.current.nombre || "Cliente",
           zona: leadRef.current.zona,
           tipo: leadRef.current.tipo,
-          propiedad: `${property.tipo} en ${property.barrio}, ${property.departamento}`,
+          propiedad: `${activeProp.tipo} en ${activeProp.barrio}, ${activeProp.departamento}`,
           email: leadRef.current.email,
         },
       });
@@ -518,6 +519,24 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
         }. ¡Hasta pronto!`,
       });
       setDone(true);
+
+      // Una sola vez: ofrecemos otras propiedades que también podrían
+      // interesarle. Si elige alguna, reutilizamos sus datos (no volvemos
+      // a preguntar) y coordinamos otra visita.
+      if (!offeredRecRef.current) {
+        offeredRecRef.current = true;
+        const { cards } = recommendProps();
+        if (cards.length > 0) {
+          await new Promise((r) => setTimeout(r, 600));
+          await botReply(
+            {
+              text: "Además, tengo estas otras propiedades que también podrían interesarte. Si alguna te gusta, tocá “Me interesa también” y coordinamos la visita 👇",
+              recCards: cards,
+            },
+            900,
+          );
+        }
+      }
     } catch (err) {
       console.error("[calendar] No se pudo crear el evento:", err);
       setTyping(false);
@@ -527,7 +546,32 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
         text: "Tuve un problema al confirmar la visita. Probá con otro horario o un asesor se va a contactar con vos para coordinarla.",
       });
     }
-  }, [addMsg, confirming, property, selectedSlot, slotConfirmed]);
+  }, [addMsg, botReply, confirming, recommendProps, selectedSlot, slotConfirmed]);
+
+  // El usuario eligió "Me interesa también" sobre una recomendación.
+  // Reutilizamos sus datos ya recolectados: enviamos el lead con la nueva
+  // propiedad y volvemos a abrir la agenda, sin repetir las preguntas.
+  const expressInterest = useCallback(
+    async (p: Property) => {
+      if (typing || confirming) return;
+      addMsg({
+        role: "user",
+        text: `Me interesa también: ${p.tipo} en ${p.barrio}`,
+      });
+      activePropRef.current = p;
+      setSelectedSlot(null);
+      setSlotConfirmed(false);
+      setConfirming(false);
+      setDone(false);
+      setNotQualified(false);
+      void sendLeadToSheet(leadPayload(leadRef.current, p));
+      stepRef.current = 4;
+      await presentAgenda(
+        `¡Genial! Coordinemos también una visita para ${p.tipo} en ${p.barrio}. Elegí uno de los horarios disponibles:`,
+      );
+    },
+    [addMsg, confirming, presentAgenda, typing],
+  );
 
 
 
