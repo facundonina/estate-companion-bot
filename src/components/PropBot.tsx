@@ -262,6 +262,9 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
   // cambiar si elige "Me interesa también" sobre una recomendación).
   const activePropRef = useRef<Property>(property);
   const offeredRecRef = useRef(false);
+  // Horario ya confirmado para la reunión. Si el lead suma otra propiedad
+  // con "Me interesa también", la coordinamos en este mismo horario.
+  const confirmedSlotRef = useRef<Slot | null>(null);
   const idRef = useRef(0);
   const scrollRef = useRef<HTMLDivElement>(null);
   const startedRef = useRef(false);
