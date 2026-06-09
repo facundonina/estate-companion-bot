@@ -395,7 +395,68 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
           }
           case 3: {
             lead.financiamiento = text;
+            stepRef.current = 5;
+            await botReply(
+              {
+                text: "Por último, ¿cuál es tu presupuesto aproximado para esta compra?",
+                quickReplies: [
+                  { label: "Hasta USD 80K", value: "Hasta USD 80K" },
+                  { label: "USD 80K – 150K", value: "USD 80K – 150K" },
+                  { label: "USD 150K – 300K", value: "USD 150K – 300K" },
+                  { label: "Más de USD 300K", value: "Más de USD 300K" },
+                ],
+              },
+              700,
+            );
+            return;
+          }
+          case 5: {
+            const m: Record<string, number> = {
+              "Hasta USD 80K": 65000,
+              "USD 80K – 150K": 115000,
+              "USD 150K – 300K": 225000,
+              "Más de USD 300K": 400000,
+            };
+            lead.presupuesto = m[text] || 115000;
             lead.prioridad = calcPrioridad(lead);
+
+            const { ok, reasons } = qualifyForProperty(property, lead);
+
+            // No califica para esta propiedad: NO entregamos el lead.
+            // Lo derivamos a ver opciones que sí encajan.
+            if (!ok) {
+              const { cards } = recommendProps();
+              await botReply(
+                {
+                  text: `Gracias por contarme. Mirando lo que necesitás, ${reasons.join(
+                    " y ",
+                  )}. Por eso esta propiedad no sería la mejor opción para vos.`,
+                },
+                1000,
+              );
+              if (cards.length > 0) {
+                await new Promise((r) => setTimeout(r, 400));
+                await botReply(
+                  {
+                    text: "Con tus preferencias, estas opciones sí encajan mejor:",
+                    cards,
+                  },
+                  900,
+                );
+              }
+              await new Promise((r) => setTimeout(r, 300));
+              await botReply(
+                {
+                  text: "Te invito a verlas en detalle y elegir la que más te guste 👇",
+                  cta: { label: "Ver propiedades disponibles" },
+                },
+                600,
+              );
+              setNotQualified(true);
+              return;
+            }
+
+            // Califica: entregamos el lead y coordinamos la visita.
             void sendLeadToSheet({
               nombre: lead.nombre,
               telefono: lead.telefono,
@@ -403,6 +464,7 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
               mensaje: lead.mensaje,
               zona: lead.zona,
               tipo: lead.tipo,
+              presupuesto: lead.presupuesto,
               proposito: lead.proposito,
               urgencia: lead.urgencia,
               financiamiento: lead.financiamiento,
