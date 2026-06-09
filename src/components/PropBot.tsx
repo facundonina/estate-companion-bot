@@ -425,26 +425,24 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
             stepRef.current = 5;
             await botReply(
               {
-                text: "Por último, ¿cuál es tu presupuesto aproximado para esta compra?",
-                quickReplies: [
-                  { label: "Hasta USD 80K", value: "Hasta USD 80K" },
-                  { label: "USD 80K – 150K", value: "USD 80K – 150K" },
-                  { label: "USD 150K – 300K", value: "USD 150K – 300K" },
-                  { label: "Más de USD 300K", value: "Más de USD 300K" },
-                ],
+                text: "Por último, ¿cuál es tu presupuesto aproximado para esta compra? Escribilo en dólares (por ejemplo: 90.000 o USD 120.000).",
               },
               700,
             );
             return;
           }
           case 5: {
-            const m: Record<string, number> = {
-              "Hasta USD 80K": 65000,
-              "USD 80K – 150K": 115000,
-              "USD 150K – 300K": 225000,
-              "Más de USD 300K": 400000,
-            };
-            lead.presupuesto = m[text] || 115000;
+            const presupuesto = parseBudget(text);
+            if (presupuesto === null) {
+              await botReply(
+                {
+                  text: "No pude entender ese monto 🤔. Escribí tu presupuesto en dólares, por ejemplo: 90.000 o USD 120.000.",
+                },
+                600,
+              );
+              return;
+            }
+            lead.presupuesto = presupuesto;
             lead.prioridad = calcPrioridad(lead);
 
             const { ok, reasons } = qualifyForProperty(property, lead);
@@ -470,15 +468,24 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
                   },
                   900,
                 );
+                await new Promise((r) => setTimeout(r, 300));
+                await botReply(
+                  {
+                    text: "Te invito a verlas en detalle y elegir la que más te guste 👇",
+                    cta: { label: "Ver propiedades disponibles" },
+                  },
+                  600,
+                );
+              } else {
+                await new Promise((r) => setTimeout(r, 400));
+                await botReply(
+                  {
+                    text: "Por ahora no tenemos propiedades que se ajusten a tu presupuesto y a lo que estás buscando. De todos modos, te invito a recorrer todo nuestro catálogo por si encontrás algo que te guste 👇",
+                    cta: { label: "Ver propiedades disponibles" },
+                  },
+                  900,
+                );
               }
-              await new Promise((r) => setTimeout(r, 300));
-              await botReply(
-                {
-                  text: "Te invito a verlas en detalle y elegir la que más te guste 👇",
-                  cta: { label: "Ver propiedades disponibles" },
-                },
-                600,
-              );
               setNotQualified(true);
               return;
             }
