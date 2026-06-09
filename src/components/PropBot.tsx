@@ -478,7 +478,7 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
           cliente: leadRef.current.nombre || "Cliente",
           zona: leadRef.current.zona,
           tipo: leadRef.current.tipo,
-          propiedad: propertyTitle(property),
+          propiedad: `${property.tipo} en ${property.barrio}, ${property.departamento}`,
           email: leadRef.current.email,
         },
       });
