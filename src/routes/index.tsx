@@ -82,8 +82,46 @@ function Index() {
         </div>
       </section>
 
+      {/* Asistente de búsqueda */}
+      <section className="mx-auto max-w-6xl px-4 py-16">
+        <div className="grid items-center gap-10 lg:grid-cols-2">
+          <div>
+            <span className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-1.5 text-sm font-medium text-primary">
+              <MessageCircle size={15} /> Asistente inteligente
+            </span>
+            <h2 className="mt-4 text-3xl font-bold text-foreground">
+              Contanos qué buscás y te encontramos la propiedad ideal
+            </h2>
+            <p className="mt-3 text-muted-foreground">
+              Respondé unas pocas preguntas y nuestro asistente filtra el
+              catálogo por vos. Te mostramos solo las opciones que encajan con
+              lo que necesitás, con el detalle de cada una para que coordines la
+              visita al instante.
+            </p>
+            <ul className="mt-5 space-y-2 text-sm text-muted-foreground">
+              <li className="flex items-center gap-2">
+                <span className="h-1.5 w-1.5 rounded-full bg-gold" /> Búsqueda
+                guiada por tipo, zona, dormitorios y presupuesto
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="h-1.5 w-1.5 rounded-full bg-gold" /> Solo te
+                mostramos lo que se ajusta a vos
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="h-1.5 w-1.5 rounded-full bg-gold" /> Coordiná la
+                visita en segundos
+              </li>
+            </ul>
+          </div>
+          <div className="mx-auto w-full max-w-md">
+            <SearchBot />
+          </div>
+        </div>
+      </section>
+
       {/* Departamentos */}
       <section className="mx-auto max-w-6xl px-4 py-16">
+
         <h2 className="text-2xl font-bold text-foreground">Explorá por zona</h2>
         <p className="mt-1 text-muted-foreground">
           Propiedades en los principales departamentos del país.
