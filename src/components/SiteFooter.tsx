@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Home, MessageCircle } from "lucide-react";
+import { Home } from "lucide-react";
 
 export function SiteFooter() {
   return (
@@ -13,8 +13,8 @@ export function SiteFooter() {
             <span className="font-serif text-xl font-bold">Habita.uy</span>
           </div>
           <p className="mt-3 max-w-xs text-sm text-primary-foreground/70">
-            El portal inmobiliario de Uruguay con asistente inteligente por
-            WhatsApp.
+            El portal inmobiliario de Uruguay con asistente inteligente que
+            atiende cada consulta.
           </p>
         </div>
 
@@ -24,7 +24,6 @@ export function SiteFooter() {
           </h4>
           <ul className="mt-4 space-y-2 text-sm text-primary-foreground/80">
             <li><Link to="/propiedades" className="hover:text-primary-foreground">Propiedades</Link></li>
-            <li><Link to="/agente" className="hover:text-primary-foreground">Agente IA</Link></li>
             <li><Link to="/" className="hover:text-primary-foreground">Inicio</Link></li>
           </ul>
         </div>
@@ -44,12 +43,10 @@ export function SiteFooter() {
           <h4 className="font-sans text-sm font-semibold uppercase tracking-wide text-primary-foreground/60">
             Contacto
           </h4>
-          <a
-            href="https://wa.me/59800000000"
-            className="mt-4 inline-flex items-center gap-2 rounded-lg bg-gold px-4 py-2 text-sm font-semibold text-gold-foreground"
-          >
-            <MessageCircle size={16} /> Hablar por WhatsApp
-          </a>
+          <p className="mt-4 text-sm text-primary-foreground/80">
+            Dejá tus datos en el formulario de cualquier propiedad y nuestro
+            asistente te contacta al instante.
+          </p>
         </div>
       </div>
       <div className="border-t border-primary-foreground/10 py-5 text-center text-xs text-primary-foreground/60">
