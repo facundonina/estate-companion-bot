@@ -707,6 +707,14 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
                   ))}
                 </div>
               )}
+              {m.cta && (
+                <Link
+                  to="/propiedades"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-[13px] font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+                >
+                  {m.cta.label} <ArrowRight size={14} />
+                </Link>
+              )}
               {m.agenda && (
                 <div className="w-full max-w-[280px] rounded-xl border border-border bg-card p-3">
                   <p className="mb-2 flex items-center gap-1.5 text-[13px] font-semibold text-foreground">
