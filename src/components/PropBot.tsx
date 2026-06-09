@@ -557,8 +557,8 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
                   <p className="mb-2 flex items-center gap-1.5 text-[13px] font-semibold text-foreground">
                     <Calendar size={15} className="text-primary" /> Elegí un horario
                   </p>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {slots.current.map((s) => {
+                  <div className="grid max-h-52 grid-cols-2 gap-1.5 overflow-y-auto">
+                    {availableSlots.map((s) => {
                       const active = selectedSlot?.id === s.id;
                       return (
                         <button
