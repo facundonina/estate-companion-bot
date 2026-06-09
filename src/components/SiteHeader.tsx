@@ -36,17 +36,10 @@ export function SiteHeader() {
             Propiedades
           </Link>
           <Link
-            to="/agente"
-            className="hidden text-muted-foreground transition-colors hover:text-foreground sm:block"
-            activeProps={{ className: "text-foreground" }}
-          >
-            Agente IA
-          </Link>
-          <Link
             to="/propiedades"
             className="rounded-lg bg-primary px-4 py-2 text-primary-foreground transition-colors hover:bg-primary/90"
           >
-            Buscar
+            Ver propiedades
           </Link>
         </nav>
       </div>

@@ -67,8 +67,7 @@ export function LeadForm({ property }: { property: Property }) {
       setErrors(fieldErrors);
       return;
     }
-    // Aún no hay backend: por ahora confirmamos al usuario.
-    // Próximo paso: conectar este lead con el bot de WhatsApp.
+    // El lead se entrega al asistente del chat (PropBot) tras confirmar.
     setSubmitted(true);
     toast.success("¡Listo! Recibimos tus datos", {
       description: "Nuestro asistente se va a contactar contigo en breve.",

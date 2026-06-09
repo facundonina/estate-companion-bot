@@ -4,7 +4,6 @@ import { properties } from "@/data/properties";
 import { PropertyCard } from "@/components/PropertyCard";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
-import { AgentSection } from "@/components/AgentSection";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -13,13 +12,13 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Encontrá apartamentos, casas, lotes y campos en todo Uruguay. Portal inmobiliario con asistente inteligente por WhatsApp que atiende y da seguimiento a cada consulta.",
+          "Encontrá apartamentos, casas, lotes y campos en todo Uruguay. Portal inmobiliario con asistente inteligente que atiende y da seguimiento a cada consulta.",
       },
       { property: "og:title", content: "Habita.uy — Portal inmobiliario de Uruguay" },
       {
         property: "og:description",
         content:
-          "Apartamentos, casas, lotes y campos en todo Uruguay, con asistente inteligente por WhatsApp.",
+          "Apartamentos, casas, lotes y campos en todo Uruguay, con asistente inteligente.",
       },
     ],
   }),
@@ -62,8 +61,8 @@ function Index() {
             <span className="text-gold">esperando</span>
           </h1>
           <p className="mx-auto mt-5 max-w-xl text-lg text-primary-foreground/80">
-            Apartamentos, casas, lotes y campos seleccionados. Y un asistente por
-            WhatsApp que responde tus consultas al instante.
+            Apartamentos, casas, lotes y campos seleccionados. Y un asistente
+            inteligente que responde tus consultas al instante.
           </p>
           <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
             <Link
@@ -71,12 +70,6 @@ function Index() {
               className="inline-flex items-center gap-2 rounded-xl bg-gold px-6 py-3 font-semibold text-gold-foreground transition-transform hover:scale-[1.03]"
             >
               <Search size={18} /> Ver propiedades
-            </Link>
-            <Link
-              to="/agente"
-              className="inline-flex items-center gap-2 rounded-xl border border-primary-foreground/25 px-6 py-3 font-semibold transition-colors hover:bg-primary-foreground/10"
-            >
-              Conocé el agente IA <ArrowRight size={18} />
             </Link>
           </div>
 
@@ -133,7 +126,6 @@ function Index() {
         </div>
       </section>
 
-      <AgentSection />
       <SiteFooter />
     </div>
   );
