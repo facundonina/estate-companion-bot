@@ -623,6 +623,32 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
                   ))}
                 </div>
               )}
+              {m.recCards && (
+                <div className="flex w-full max-w-[260px] flex-col gap-3">
+                  {m.recCards.map((c) => (
+                    <div key={c.id} className="flex flex-col gap-1.5">
+                      <PropertyCardBubble p={c} />
+                      <div className="flex gap-1.5">
+                        <Link
+                          to="/propiedades/$id"
+                          params={{ id: String(c.id) }}
+                          className="flex-1 rounded-full border border-border bg-card px-3 py-1.5 text-center text-[12px] font-medium text-foreground transition-colors hover:bg-secondary"
+                        >
+                          Ver
+                        </Link>
+                        <button
+                          type="button"
+                          disabled={typing || confirming}
+                          onClick={() => expressInterest(c)}
+                          className="flex-1 rounded-full bg-primary px-3 py-1.5 text-center text-[12px] font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
+                        >
+                          Me interesa también
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
               {m.cta && (
                 <Link
                   to="/propiedades"
