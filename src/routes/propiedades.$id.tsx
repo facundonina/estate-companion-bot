@@ -202,7 +202,7 @@ function PropertyDetail() {
               {formatPrice(p.precio, p.moneda)}
             </p>
 
-            <div className="my-5 border-t border-border" />
+            <div class="my-5 border-t border-border" />
 
             <p className="text-sm font-semibold text-foreground">
               Asesor a cargo
@@ -210,19 +210,9 @@ function PropertyDetail() {
             <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
               <Phone size={14} /> {p.contacto}
             </p>
-
-            <a
-              href={`https://wa.me/59800000000?text=${encodeURIComponent(
-                `Hola, me interesa la propiedad #${p.id}: ${propertyTitle(p.tipo, p.barrio, p.dormitorios)}`,
-              )}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-gold px-4 py-3 font-semibold text-gold-foreground transition-transform hover:scale-[1.02]"
-            >
-              <MessageCircle size={18} /> Consultar por WhatsApp
-            </a>
-            <p className="mt-3 text-center text-xs text-muted-foreground">
-              Nuestro asistente te responde al instante y coordina la visita.
+            <p className="mt-3 text-xs text-muted-foreground">
+              Completá el formulario y nuestro asistente te responde al instante
+              y coordina la visita.
             </p>
           </div>
 
