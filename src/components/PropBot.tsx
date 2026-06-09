@@ -278,30 +278,35 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
     const pool = properties.filter((x) => x.id !== property.id);
 
     const tipoOk = (p: Property) => !lead.tipo || p.tipo === lead.tipo;
-    // El presupuesto no puede ser menor al 60% del precio de la propiedad.
+    // El precio no puede superar el presupuesto del usuario (con un margen
+    // chico del 10%). Nunca recomendamos propiedades fuera de su alcance.
     const budgetOk = (p: Property) =>
-      !lead.presupuesto || lead.presupuesto >= p.precio * 0.6;
+      !lead.presupuesto || p.precio <= lead.presupuesto * 1.1;
     const sortTop = (arr: Property[]) =>
       [...arr].sort((a, b) => scoreProp(b, lead) - scoreProp(a, lead));
 
     // Paso 1: zona exacta + filtros duros (tipo + presupuesto).
     let expanded = false;
-    let scope = pool.filter((p) => p.zona === lead.zona);
-    let filtered = scope.filter((p) => tipoOk(p) && budgetOk(p));
+    let filtered = pool.filter(
+      (p) => p.zona === lead.zona && tipoOk(p) && budgetOk(p),
+    );
 
     // Paso 2: si hay menos de 3, expandir a zonas relacionadas.
     if (filtered.length < 3) {
       expanded = true;
-      scope = pool.filter(
-        (p) => p.zona === lead.zona || isRelatedZona(p, lead.zona),
+      filtered = pool.filter(
+        (p) =>
+          (p.zona === lead.zona || isRelatedZona(p, lead.zona)) &&
+          tipoOk(p) &&
+          budgetOk(p),
       );
-      filtered = scope.filter((p) => tipoOk(p) && budgetOk(p));
     }
 
-    // Paso 3: si aún hay menos de 3, completar sin filtro de precio
-    // pero manteniendo siempre la zona (scope) y el tipo.
+    // Paso 3: si aún hay menos de 3, relajar el tipo pero SIEMPRE
+    // respetando el presupuesto. Nunca mostramos propiedades fuera de él.
     if (filtered.length < 3) {
-      filtered = scope.filter((p) => tipoOk(p));
+      expanded = true;
+      filtered = pool.filter((p) => budgetOk(p));
     }
 
     return { cards: sortTop(filtered).slice(0, 3), expanded };
