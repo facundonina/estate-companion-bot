@@ -300,10 +300,22 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
 
       if (flowRef.current === "prop" && stepRef.current === 1) {
         if (text === "esta") {
-          await presentAgenda(
-            "¡Genial! Podemos coordinar una visita para que la conozcas en persona. Elegí uno de los horarios disponibles:",
-          );
+          lead.zona = property.zona;
+          lead.tipo = property.tipo;
           stepRef.current = 2;
+          await botReply(
+            {
+              text: "¡Genial! Antes de coordinar la visita, me gustaría conocer un par de cosas. ¿Cuándo necesitás concretar la compra?",
+              quickReplies: [
+                { label: "Menos de 3 meses", value: "Menos de 3 meses" },
+                { label: "3 a 6 meses", value: "3 a 6 meses" },
+                { label: "En el año", value: "En el año" },
+                { label: "Estoy explorando", value: "Estoy explorando" },
+              ],
+            },
+            800,
+          );
+          return;
         } else {
           flowRef.current = "similar";
           lead.zona = property.zona;
