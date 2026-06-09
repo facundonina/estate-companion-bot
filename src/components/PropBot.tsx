@@ -157,6 +157,32 @@ function qualifyForProperty(
   return { ok: reasons.length === 0, reasons };
 }
 
+// Construye el payload para Google Sheets incluyendo la propiedad puntual
+// que está consultando el lead, para que el vendedor sepa por cuál se interesó.
+function leadPayload(lead: BotLeadState, prop: Property) {
+  const origin =
+    typeof window !== "undefined" ? window.location.origin : "";
+  return {
+    nombre: lead.nombre,
+    telefono: lead.telefono,
+    email: lead.email,
+    mensaje: lead.mensaje,
+    zona: lead.zona,
+    tipo: lead.tipo,
+    dormitorios: lead.dormitorios,
+    presupuesto: lead.presupuesto,
+    proposito: lead.proposito,
+    urgencia: lead.urgencia,
+    financiamiento: lead.financiamiento,
+    prioridad: lead.prioridad,
+    propiedad: `${prop.tipo} en ${prop.barrio}, ${prop.departamento}`,
+    propiedadId: prop.id,
+    propiedadLink: `${origin}/propiedades/${prop.id}`,
+  };
+}
+
+
+
 
 
 
