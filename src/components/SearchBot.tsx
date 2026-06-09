@@ -200,7 +200,16 @@ export function SearchBot() {
       switch (stepRef.current) {
         case 1: {
           const tipo = TIPOS.find((t) => t.toLowerCase() === text.toLowerCase());
-          s.tipo = tipo || text;
+          if (!tipo) {
+            await botReply(
+              {
+                text: "No reconocí esa opción 🤔. Elegí uno de los tipos de propiedad de la lista para continuar.",
+              },
+              600,
+            );
+            return;
+          }
+          s.tipo = tipo;
           stepRef.current = 2;
           await botReply(
             {
@@ -215,7 +224,16 @@ export function SearchBot() {
           const dep = DEPARTAMENTOS.find(
             (d) => d.toLowerCase() === text.toLowerCase(),
           );
-          s.departamento = dep || text;
+          if (!dep) {
+            await botReply(
+              {
+                text: "No reconocí ese departamento 🤔. Elegí uno de la lista para continuar.",
+              },
+              600,
+            );
+            return;
+          }
+          s.departamento = dep;
           if (isLandTipo(s.tipo)) {
             stepRef.current = 4;
             await botReply(
@@ -243,7 +261,16 @@ export function SearchBot() {
         }
         case 3: {
           const n = parseInt(text, 10);
-          s.dormitorios = Number.isFinite(n) ? n : undefined;
+          if (!Number.isFinite(n) || n <= 0) {
+            await botReply(
+              {
+                text: "No pude entender ese número 🤔. Decime cuántos dormitorios necesitás (por ejemplo: 1, 2 o 3).",
+              },
+              600,
+            );
+            return;
+          }
+          s.dormitorios = n;
           stepRef.current = 4;
           await botReply(
             {
