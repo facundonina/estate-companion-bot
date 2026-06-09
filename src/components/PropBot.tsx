@@ -4,6 +4,11 @@ import { properties, type Property } from "@/data/properties";
 import { formatPrice, propertyTitle } from "@/lib/format";
 import { propertyImage } from "@/lib/propertyImage";
 import { sendLeadToSheet } from "@/lib/leadSheet";
+import {
+  getAvailableSlots,
+  createCalendarEvent,
+  type CalendarSlot,
+} from "@/lib/calendar.functions";
 
 export interface BotLead {
   nombre: string;
