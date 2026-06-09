@@ -155,6 +155,8 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
   const [done, setDone] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
   const [slotConfirmed, setSlotConfirmed] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [availableSlots, setAvailableSlots] = useState<CalendarSlot[]>([]);
 
   const leadRef = useRef<BotLeadState>({ ...lead });
   const stepRef = useRef(0);
