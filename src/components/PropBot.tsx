@@ -300,10 +300,22 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
 
       if (flowRef.current === "prop" && stepRef.current === 1) {
         if (text === "esta") {
-          await presentAgenda(
-            "¡Genial! Podemos coordinar una visita para que la conozcas en persona. Elegí uno de los horarios disponibles:",
-          );
+          lead.zona = property.zona;
+          lead.tipo = property.tipo;
           stepRef.current = 2;
+          await botReply(
+            {
+              text: "¡Genial! Antes de coordinar la visita, me gustaría conocer un par de cosas. ¿Cuándo necesitás concretar la compra?",
+              quickReplies: [
+                { label: "Menos de 3 meses", value: "Menos de 3 meses" },
+                { label: "3 a 6 meses", value: "3 a 6 meses" },
+                { label: "En el año", value: "En el año" },
+                { label: "Estoy explorando", value: "Estoy explorando" },
+              ],
+            },
+            800,
+          );
+          return;
         } else {
           flowRef.current = "similar";
           lead.zona = property.zona;
@@ -324,6 +336,53 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
         }
         return;
       }
+
+      if (flowRef.current === "prop") {
+        switch (stepRef.current) {
+          case 2: {
+            lead.urgencia = text;
+            stepRef.current = 3;
+            await botReply(
+              {
+                text: "¿Cómo pensás financiar la compra?",
+                quickReplies: [
+                  { label: "Efectivo listo", value: "Efectivo listo" },
+                  {
+                    label: "Crédito hipotecario aprobado",
+                    value: "Crédito hipotecario aprobado",
+                  },
+                  { label: "Crédito en trámite", value: "Crédito en trámite" },
+                  { label: "No lo definí todavía", value: "No lo definí todavía" },
+                ],
+              },
+              700,
+            );
+            return;
+          }
+          case 3: {
+            lead.financiamiento = text;
+            lead.prioridad = calcPrioridad(lead);
+            void sendLeadToSheet({
+              nombre: lead.nombre,
+              telefono: lead.telefono,
+              email: lead.email,
+              mensaje: lead.mensaje,
+              zona: lead.zona,
+              tipo: lead.tipo,
+              proposito: lead.proposito,
+              urgencia: lead.urgencia,
+              financiamiento: lead.financiamiento,
+              prioridad: lead.prioridad,
+            });
+            stepRef.current = 4;
+            await presentAgenda(
+              "¡Gracias! Podemos coordinar una visita para que la conozcas en persona. Elegí uno de los horarios disponibles:",
+            );
+            return;
+          }
+        }
+      }
+
 
       if (flowRef.current === "similar") {
         switch (stepRef.current) {
@@ -625,27 +684,38 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
       </div>
 
       {/* Input */}
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          handleSend(input);
-        }}
-        className="flex items-center gap-2 border-t border-border p-2.5"
-      >
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Escribí tu mensaje..."
-          className="flex-1 rounded-full border border-border bg-secondary px-3.5 py-2 text-[13px] text-foreground outline-none focus:border-primary"
-        />
-        <button
-          type="submit"
-          aria-label="Enviar"
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-opacity hover:opacity-90"
+      {slotConfirmed ? (
+        <div className="border-t border-border p-3.5 text-center">
+          <p className="text-[13px] font-medium text-foreground">
+            ✅ Visita confirmada
+          </p>
+          <p className="mt-0.5 text-[12px] text-muted-foreground">
+            Esta conversación quedó cerrada. ¡Nos vemos en la visita!
+          </p>
+        </div>
+      ) : (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleSend(input);
+          }}
+          className="flex items-center gap-2 border-t border-border p-2.5"
         >
-          <Send size={15} />
-        </button>
-      </form>
+          <input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Escribí tu mensaje..."
+            className="flex-1 rounded-full border border-border bg-secondary px-3.5 py-2 text-[13px] text-foreground outline-none focus:border-primary"
+          />
+          <button
+            type="submit"
+            aria-label="Enviar"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-opacity hover:opacity-90"
+          >
+            <Send size={15} />
+          </button>
+        </form>
+      )}
     </div>
   );
 }
