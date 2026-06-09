@@ -354,18 +354,22 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
         },
         900,
       );
+      leadRef.current.zona = property.zona;
+      leadRef.current.tipo = property.tipo;
       await new Promise((r) => setTimeout(r, 300));
       await botReply(
         {
-          text: "¿Buscás específicamente esta propiedad o también te gustaría conocer opciones similares?",
+          text: "Genial. Antes de coordinar la visita, me gustaría conocer un par de cosas para asegurarme de que sea la mejor opción para vos. ¿Cuándo necesitás concretar la compra?",
           quickReplies: [
-            { label: "Me interesa esta", value: "esta" },
-            { label: "Ver opciones similares", value: "similares" },
+            { label: "Menos de 3 meses", value: "Menos de 3 meses" },
+            { label: "3 a 6 meses", value: "3 a 6 meses" },
+            { label: "En el año", value: "En el año" },
+            { label: "Estoy explorando", value: "Estoy explorando" },
           ],
         },
-        700,
+        800,
       );
-      stepRef.current = 1;
+      stepRef.current = 2;
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
