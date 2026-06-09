@@ -393,306 +393,96 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
 
       const lead = leadRef.current;
 
-      if (flowRef.current === "prop" && stepRef.current === 1) {
-        if (text === "esta") {
-          lead.zona = property.zona;
-          lead.tipo = property.tipo;
-          stepRef.current = 2;
+      switch (stepRef.current) {
+        case 2: {
+          lead.urgencia = text;
+          stepRef.current = 3;
           await botReply(
             {
-              text: "¡Genial! Antes de coordinar la visita, me gustaría conocer un par de cosas. ¿Cuándo necesitás concretar la compra?",
+              text: "¿Cómo pensás financiar la compra?",
               quickReplies: [
-                { label: "Menos de 3 meses", value: "Menos de 3 meses" },
-                { label: "3 a 6 meses", value: "3 a 6 meses" },
-                { label: "En el año", value: "En el año" },
-                { label: "Estoy explorando", value: "Estoy explorando" },
+                { label: "Efectivo listo", value: "Efectivo listo" },
+                {
+                  label: "Crédito hipotecario aprobado",
+                  value: "Crédito hipotecario aprobado",
+                },
+                { label: "Crédito en trámite", value: "Crédito en trámite" },
+                { label: "No lo definí todavía", value: "No lo definí todavía" },
               ],
             },
-            800,
+            700,
           );
           return;
-        } else {
-          flowRef.current = "similar";
-          lead.zona = property.zona;
-          lead.tipo = property.tipo;
-          stepRef.current = 10;
+        }
+        case 3: {
+          lead.financiamiento = text;
+          stepRef.current = 5;
           await botReply(
             {
-              text: "Perfecto. Para mostrarte las mejores opciones, ¿cuántos dormitorios necesitás?",
-              quickReplies: [
-                { label: "1 dormitorio", value: "1 dormitorio" },
-                { label: "2 dormitorios", value: "2 dormitorios" },
-                { label: "3 dormitorios", value: "3 dormitorios" },
-                { label: "4 o más", value: "4 o más" },
-              ],
+              text: "Por último, ¿cuál es tu presupuesto aproximado para esta compra? Escribilo en dólares (por ejemplo: 90.000 o USD 120.000).",
             },
-            800,
+            700,
           );
+          return;
         }
-        return;
-      }
+        case 5: {
+          const presupuesto = parseBudget(text);
+          if (presupuesto === null) {
+            await botReply(
+              {
+                text: "No pude entender ese monto 🤔. Escribí tu presupuesto en dólares, por ejemplo: 90.000 o USD 120.000.",
+              },
+              600,
+            );
+            return;
+          }
+          lead.presupuesto = presupuesto;
+          lead.prioridad = calcPrioridad(lead);
 
-      if (flowRef.current === "prop") {
-        switch (stepRef.current) {
-          case 2: {
-            lead.urgencia = text;
-            stepRef.current = 3;
+          const { ok, reasons } = qualifyForProperty(activePropRef.current, lead);
+
+          // No califica para esta propiedad: NO entregamos el lead.
+          // Lo derivamos a ver opciones que sí encajan.
+          if (!ok) {
+            const { cards } = recommendProps();
             await botReply(
               {
-                text: "¿Cómo pensás financiar la compra?",
-                quickReplies: [
-                  { label: "Efectivo listo", value: "Efectivo listo" },
-                  {
-                    label: "Crédito hipotecario aprobado",
-                    value: "Crédito hipotecario aprobado",
-                  },
-                  { label: "Crédito en trámite", value: "Crédito en trámite" },
-                  { label: "No lo definí todavía", value: "No lo definí todavía" },
-                ],
+                text: `Gracias por contarme. Mirando lo que necesitás, ${reasons.join(
+                  " y ",
+                )}. Por eso esta propiedad no sería la mejor opción para vos.`,
               },
-              700,
+              1000,
             );
-            return;
-          }
-          case 3: {
-            lead.financiamiento = text;
-            stepRef.current = 5;
-            await botReply(
-              {
-                text: "Por último, ¿cuál es tu presupuesto aproximado para esta compra? Escribilo en dólares (por ejemplo: 90.000 o USD 120.000).",
-              },
-              700,
-            );
-            return;
-          }
-          case 5: {
-            const presupuesto = parseBudget(text);
-            if (presupuesto === null) {
+            if (cards.length > 0) {
+              await new Promise((r) => setTimeout(r, 400));
               await botReply(
                 {
-                  text: "No pude entender ese monto 🤔. Escribí tu presupuesto en dólares, por ejemplo: 90.000 o USD 120.000.",
+                  text: "Con tus preferencias, estas opciones sí encajan mejor. Si alguna te interesa, tocá “Me interesa también” y coordinamos la visita:",
+                  recCards: cards,
                 },
-                600,
+                900,
               );
-              return;
-            }
-            lead.presupuesto = presupuesto;
-            lead.prioridad = calcPrioridad(lead);
-
-            const { ok, reasons } = qualifyForProperty(property, lead);
-
-            // No califica para esta propiedad: NO entregamos el lead.
-            // Lo derivamos a ver opciones que sí encajan.
-            if (!ok) {
-              const { cards } = recommendProps();
-              await botReply(
-                {
-                  text: `Gracias por contarme. Mirando lo que necesitás, ${reasons.join(
-                    " y ",
-                  )}. Por eso esta propiedad no sería la mejor opción para vos.`,
-                },
-                1000,
-              );
-              if (cards.length > 0) {
-                await new Promise((r) => setTimeout(r, 400));
-                await botReply(
-                  {
-                    text: "Con tus preferencias, estas opciones sí encajan mejor:",
-                    cards,
-                  },
-                  900,
-                );
-                await new Promise((r) => setTimeout(r, 300));
-                await botReply(
-                  {
-                    text: "Te invito a verlas en detalle y elegir la que más te guste 👇",
-                    cta: { label: "Ver propiedades disponibles" },
-                  },
-                  600,
-                );
-              } else {
-                await new Promise((r) => setTimeout(r, 400));
-                await botReply(
-                  {
-                    text: "Por ahora no tenemos propiedades que se ajusten a tu presupuesto y a lo que estás buscando. De todos modos, te invito a recorrer todo nuestro catálogo por si encontrás algo que te guste 👇",
-                    cta: { label: "Ver propiedades disponibles" },
-                  },
-                  900,
-                );
-              }
-              setNotQualified(true);
-              return;
-            }
-
-            // Califica: entregamos el lead y coordinamos la visita.
-            void sendLeadToSheet({
-              nombre: lead.nombre,
-              telefono: lead.telefono,
-              email: lead.email,
-              mensaje: lead.mensaje,
-              zona: lead.zona,
-              tipo: lead.tipo,
-              presupuesto: lead.presupuesto,
-              proposito: lead.proposito,
-              urgencia: lead.urgencia,
-              financiamiento: lead.financiamiento,
-              prioridad: lead.prioridad,
-            });
-            stepRef.current = 4;
-            await presentAgenda(
-              "¡Gracias! Podemos coordinar una visita para que la conozcas en persona. Elegí uno de los horarios disponibles:",
-            );
-            return;
-          }
-        }
-      }
-
-
-      if (flowRef.current === "similar") {
-        switch (stepRef.current) {
-          case 10: {
-            const m: Record<string, number> = {
-              "1 dormitorio": 1,
-              "2 dormitorios": 2,
-              "3 dormitorios": 3,
-              "4 o más": 4,
-            };
-            lead.dormitorios = m[text] || 2;
-            stepRef.current = 11;
-            await botReply(
-              {
-                text: "¿Cuál sería tu presupuesto aproximado? Escribilo en dólares (por ejemplo: 90.000 o USD 120.000).",
-              },
-              700,
-            );
-            return;
-          }
-          case 11: {
-            const presupuesto = parseBudget(text);
-            if (presupuesto === null) {
-              await botReply(
-                {
-                  text: "No pude entender ese monto 🤔. Escribí tu presupuesto en dólares, por ejemplo: 90.000 o USD 120.000.",
-                },
-                600,
-              );
-              return;
-            }
-            lead.presupuesto = presupuesto;
-            stepRef.current = 12;
-            await botReply(
-              {
-                text: "¿Buscás para vivir o para invertir?",
-                quickReplies: [
-                  { label: "Para vivir", value: "Para vivir" },
-                  { label: "Para invertir", value: "Para invertir" },
-                  { label: "Las dos cosas", value: "Las dos cosas" },
-                ],
-              },
-              700,
-            );
-            return;
-          }
-          case 12: {
-            lead.proposito = text;
-            stepRef.current = 13;
-            await botReply(
-              {
-                text: "¿Hay algo que sí o sí querés que tenga? (garage, piscina, planta baja, vista al mar...). Si no, escribí 'No, está bien'.",
-              },
-              800,
-            );
-            return;
-          }
-          case 13: {
-            const low = text.toLowerCase();
-            if (low.includes("piscin")) lead.piscina = true;
-            if (low.includes("garage") || low.includes("garaje")) lead.garage = true;
-            stepRef.current = 14;
-            await botReply(
-              {
-                text: "¿Cuándo necesitás concretar?",
-                quickReplies: [
-                  { label: "Menos de 3 meses", value: "Menos de 3 meses" },
-                  { label: "3 a 6 meses", value: "3 a 6 meses" },
-                  { label: "En el año", value: "En el año" },
-                  { label: "Estoy explorando", value: "Estoy explorando" },
-                ],
-              },
-              700,
-            );
-            return;
-          }
-          case 14: {
-            lead.urgencia = text;
-            stepRef.current = 15;
-            await botReply(
-              {
-                text: "¿Cómo pensás financiar la compra?",
-                quickReplies: [
-                  { label: "Efectivo listo", value: "Efectivo listo" },
-                  {
-                    label: "Crédito hipotecario aprobado",
-                    value: "Crédito hipotecario aprobado",
-                  },
-                  { label: "Crédito en trámite", value: "Crédito en trámite" },
-                  { label: "No lo definí todavía", value: "No lo definí todavía" },
-                ],
-              },
-              700,
-            );
-            return;
-          }
-          case 15: {
-            lead.financiamiento = text;
-            lead.prioridad = calcPrioridad(lead);
-
-            const { cards: top3, expanded } = recommendProps();
-
-            // Sin opciones dentro del presupuesto: no entregamos el lead,
-            // solo invitamos a recorrer el catálogo.
-            if (top3.length === 0) {
+            } else {
+              await new Promise((r) => setTimeout(r, 400));
               await botReply(
                 {
                   text: "Por ahora no tenemos propiedades que se ajusten a tu presupuesto y a lo que estás buscando. De todos modos, te invito a recorrer todo nuestro catálogo por si encontrás algo que te guste 👇",
                   cta: { label: "Ver propiedades disponibles" },
                 },
-                1000,
+                900,
               );
-              setNotQualified(true);
-              return;
             }
-
-            void sendLeadToSheet({
-              nombre: lead.nombre,
-              telefono: lead.telefono,
-              email: lead.email,
-              mensaje: lead.mensaje,
-              zona: lead.zona,
-              tipo: lead.tipo,
-              dormitorios: lead.dormitorios,
-              presupuesto: lead.presupuesto,
-              proposito: lead.proposito,
-              urgencia: lead.urgencia,
-              financiamiento: lead.financiamiento,
-              prioridad: lead.prioridad,
-            });
-            await botReply(
-              {
-                text: expanded
-                  ? `No encontré propiedades exactas en ${lead.zona}, pero estas opciones cercanas pueden interesarte:`
-                  : "Estas son las opciones que mejor se ajustan a lo que buscás:",
-                cards: top3,
-              },
-              1000,
-            );
-            await new Promise((r) => setTimeout(r, 400));
-            stepRef.current = 16;
-            await presentAgenda(
-              "Si alguna te interesa, podemos coordinar una visita. Elegí uno de los horarios disponibles:",
-            );
+            setNotQualified(true);
             return;
           }
+
+          // Califica: entregamos el lead y coordinamos la visita.
+          void sendLeadToSheet(leadPayload(lead, activePropRef.current));
+          stepRef.current = 4;
+          await presentAgenda(
+            "¡Gracias! Podemos coordinar una visita para que la conozcas en persona. Elegí uno de los horarios disponibles:",
+          );
+          return;
         }
       }
     },
