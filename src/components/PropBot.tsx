@@ -797,6 +797,18 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
             Esta conversación quedó cerrada. ¡Nos vemos en la visita!
           </p>
         </div>
+      ) : notQualified ? (
+        <div className="border-t border-border p-3.5 text-center">
+          <Link
+            to="/propiedades"
+            className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-[13px] font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+          >
+            Ver propiedades disponibles <ArrowRight size={14} />
+          </Link>
+          <p className="mt-2 text-[12px] text-muted-foreground">
+            Explorá las opciones que mejor se ajustan a vos.
+          </p>
+        </div>
       ) : (
         <form
           onSubmit={(e) => {
