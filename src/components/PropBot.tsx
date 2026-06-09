@@ -527,26 +527,24 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
             stepRef.current = 11;
             await botReply(
               {
-                text: "¿Cuál sería tu presupuesto aproximado?",
-                quickReplies: [
-                  { label: "Hasta USD 80K", value: "Hasta USD 80K" },
-                  { label: "USD 80K – 150K", value: "USD 80K – 150K" },
-                  { label: "USD 150K – 300K", value: "USD 150K – 300K" },
-                  { label: "Más de USD 300K", value: "Más de USD 300K" },
-                ],
+                text: "¿Cuál sería tu presupuesto aproximado? Escribilo en dólares (por ejemplo: 90.000 o USD 120.000).",
               },
               700,
             );
             return;
           }
           case 11: {
-            const m: Record<string, number> = {
-              "Hasta USD 80K": 65000,
-              "USD 80K – 150K": 115000,
-              "USD 150K – 300K": 225000,
-              "Más de USD 300K": 400000,
-            };
-            lead.presupuesto = m[text] || 115000;
+            const presupuesto = parseBudget(text);
+            if (presupuesto === null) {
+              await botReply(
+                {
+                  text: "No pude entender ese monto 🤔. Escribí tu presupuesto en dólares, por ejemplo: 90.000 o USD 120.000.",
+                },
+                600,
+              );
+              return;
+            }
+            lead.presupuesto = presupuesto;
             stepRef.current = 12;
             await botReply(
               {
