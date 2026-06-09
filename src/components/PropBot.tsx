@@ -564,7 +564,7 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
                         <button
                           key={s.id}
                           type="button"
-                          disabled={slotConfirmed}
+                          disabled={slotConfirmed || confirming}
                           onClick={() => setSelectedSlot(s)}
                           className={`rounded-md border px-2 py-1.5 text-center text-[12px] transition-colors disabled:cursor-not-allowed ${
                             active
