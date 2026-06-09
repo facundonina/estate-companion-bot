@@ -1,9 +1,14 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Building2, Send, Calendar, Bath, BedDouble, Maximize } from "lucide-react";
 import { properties, type Property } from "@/data/properties";
-import { formatPrice, propertyTitle } from "@/lib/format";
+import { formatPrice } from "@/lib/format";
 import { propertyImage } from "@/lib/propertyImage";
 import { sendLeadToSheet } from "@/lib/leadSheet";
+import {
+  getAvailableSlots,
+  createCalendarEvent,
+  type CalendarSlot,
+} from "@/lib/calendar.functions";
 
 export interface BotLead {
   nombre: string;
@@ -14,7 +19,7 @@ export interface BotLead {
 
 type QuickReply = { label: string; value: string };
 
-type Slot = { label: string; time: string; id: string };
+type Slot = CalendarSlot;
 
 interface BotMessage {
   id: number;
@@ -98,20 +103,7 @@ function calcPrioridad(lead: BotLeadState): string {
   return "Baja";
 }
 
-function buildSlots(): Slot[] {
-  const today = new Date();
-  const dias = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
-  const meses = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
-  const slots: Slot[] = [];
-  for (let i = 1; i <= 3; i++) {
-    const d = new Date(today);
-    d.setDate(d.getDate() + i);
-    const label = `${dias[d.getDay()]} ${d.getDate()} ${meses[d.getMonth()]}`;
-    slots.push({ label, time: "10:00 hs", id: `s${i}a` });
-    slots.push({ label, time: "16:00 hs", id: `s${i}b` });
-  }
-  return slots;
-}
+
 
 function PropertyCardBubble({ p }: { p: Property }) {
   const isLand = p.tipo === "Lote" || p.tipo === "Campo";
@@ -163,6 +155,8 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
   const [done, setDone] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
   const [slotConfirmed, setSlotConfirmed] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [availableSlots, setAvailableSlots] = useState<CalendarSlot[]>([]);
 
   const leadRef = useRef<BotLeadState>({ ...lead });
   const stepRef = useRef(0);
@@ -183,6 +177,36 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
       await new Promise((r) => setTimeout(r, delay));
       setTyping(false);
       addMsg({ ...msg, role: "bot" });
+    },
+    [addMsg],
+  );
+
+  // Consulta Google Calendar y muestra los horarios disponibles como agenda.
+  const presentAgenda = useCallback(
+    async (intro: string) => {
+      setTyping(true);
+      try {
+        const slots = await getAvailableSlots();
+        setAvailableSlots(slots);
+        setTyping(false);
+        if (slots.length === 0) {
+          addMsg({
+            role: "bot",
+            text: "Por ahora no tengo horarios disponibles en los próximos días. Un asesor se va a contactar con vos para coordinar la visita. ¡Gracias!",
+          });
+          setDone(true);
+        } else {
+          addMsg({ role: "bot", text: intro, agenda: true });
+        }
+      } catch (err) {
+        console.error("[calendar] No se pudieron obtener los horarios:", err);
+        setTyping(false);
+        addMsg({
+          role: "bot",
+          text: "Tuve un problema al consultar la agenda. Un asesor se va a contactar con vos para coordinar la visita. ¡Gracias!",
+        });
+        setDone(true);
+      }
     },
     [addMsg],
   );
@@ -276,12 +300,8 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
 
       if (flowRef.current === "prop" && stepRef.current === 1) {
         if (text === "esta") {
-          await botReply(
-            {
-              text: "¡Genial! Podemos coordinar una visita para que la conozcas en persona. Elegí un horario que te venga bien:",
-              agenda: true,
-            },
-            800,
+          await presentAgenda(
+            "¡Genial! Podemos coordinar una visita para que la conozcas en persona. Elegí uno de los horarios disponibles:",
           );
           stepRef.current = 2;
         } else {
@@ -430,38 +450,59 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
               1000,
             );
             await new Promise((r) => setTimeout(r, 400));
-            await botReply(
-              {
-                text: "Si alguna te interesa, podemos coordinar una visita. Un asesor también se va a contactar con vos para acompañarte. ¡Gracias!",
-              },
-              700,
+            stepRef.current = 16;
+            await presentAgenda(
+              "Si alguna te interesa, podemos coordinar una visita. Elegí uno de los horarios disponibles:",
             );
-            setDone(true);
             return;
           }
         }
       }
     },
-    [addMsg, botReply, done, property, recommendProps, typing],
+    [addMsg, botReply, done, presentAgenda, property, recommendProps, typing],
   );
 
   const confirmSlot = useCallback(async () => {
-    if (!selectedSlot || slotConfirmed) return;
-    setSlotConfirmed(true);
+    if (!selectedSlot || slotConfirmed || confirming) return;
+    setConfirming(true);
     addMsg({
       role: "user",
       text: `Confirmo la visita para el ${selectedSlot.label} a las ${selectedSlot.time}`,
     });
-    await botReply(
-      {
-        text: `¡Listo! Tu visita quedó agendada para el ${selectedSlot.label} a las ${selectedSlot.time}. Te confirmamos por email a ${leadRef.current.email || "tu correo"}. Si necesitás reprogramar, avisanos. ¡Hasta pronto!`,
-      },
-      1000,
-    );
-    setDone(true);
-  }, [addMsg, botReply, selectedSlot, slotConfirmed]);
+    setTyping(true);
+    try {
+      await createCalendarEvent({
+        data: {
+          startISO: selectedSlot.startISO,
+          endISO: selectedSlot.endISO,
+          cliente: leadRef.current.nombre || "Cliente",
+          zona: leadRef.current.zona,
+          tipo: leadRef.current.tipo,
+          propiedad: `${property.tipo} en ${property.barrio}, ${property.departamento}`,
+          email: leadRef.current.email,
+        },
+      });
+      setTyping(false);
+      setSlotConfirmed(true);
+      addMsg({
+        role: "bot",
+        text: `¡Listo! Tu visita quedó confirmada para el ${selectedSlot.label} a las ${selectedSlot.time}. Vas a recibir la confirmación por email${
+          leadRef.current.email ? ` a ${leadRef.current.email}` : ""
+        }. ¡Hasta pronto!`,
+      });
+      setDone(true);
+    } catch (err) {
+      console.error("[calendar] No se pudo crear el evento:", err);
+      setTyping(false);
+      setConfirming(false);
+      addMsg({
+        role: "bot",
+        text: "Tuve un problema al confirmar la visita. Probá con otro horario o un asesor se va a contactar con vos para coordinarla.",
+      });
+    }
+  }, [addMsg, confirming, property, selectedSlot, slotConfirmed]);
 
-  const slots = useRef<Slot[]>(buildSlots());
+
 
   return (
     <div className="flex h-[560px] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-card">
@@ -516,14 +557,14 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
                   <p className="mb-2 flex items-center gap-1.5 text-[13px] font-semibold text-foreground">
                     <Calendar size={15} className="text-primary" /> Elegí un horario
                   </p>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {slots.current.map((s) => {
+                  <div className="grid max-h-52 grid-cols-2 gap-1.5 overflow-y-auto">
+                    {availableSlots.map((s) => {
                       const active = selectedSlot?.id === s.id;
                       return (
                         <button
                           key={s.id}
                           type="button"
-                          disabled={slotConfirmed}
+                          disabled={slotConfirmed || confirming}
                           onClick={() => setSelectedSlot(s)}
                           className={`rounded-md border px-2 py-1.5 text-center text-[12px] transition-colors disabled:cursor-not-allowed ${
                             active
@@ -539,11 +580,15 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
                   </div>
                   <button
                     type="button"
-                    disabled={!selectedSlot || slotConfirmed}
+                    disabled={!selectedSlot || slotConfirmed || confirming}
                     onClick={confirmSlot}
                     className="mt-2 w-full rounded-md bg-primary py-2 text-[13px] font-semibold text-primary-foreground transition-opacity disabled:opacity-40"
                   >
-                    {slotConfirmed ? "Visita confirmada" : "Confirmar visita"}
+                    {slotConfirmed
+                      ? "Visita confirmada"
+                      : confirming
+                        ? "Confirmando..."
+                        : "Confirmar visita"}
                   </button>
                 </div>
               )}
