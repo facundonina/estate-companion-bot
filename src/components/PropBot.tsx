@@ -181,6 +181,36 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
     [addMsg],
   );
 
+  // Consulta Google Calendar y muestra los horarios disponibles como agenda.
+  const presentAgenda = useCallback(
+    async (intro: string) => {
+      setTyping(true);
+      try {
+        const slots = await getAvailableSlots();
+        setAvailableSlots(slots);
+        setTyping(false);
+        if (slots.length === 0) {
+          addMsg({
+            role: "bot",
+            text: "Por ahora no tengo horarios disponibles en los próximos días. Un asesor se va a contactar con vos para coordinar la visita. ¡Gracias!",
+          });
+          setDone(true);
+        } else {
+          addMsg({ role: "bot", text: intro, agenda: true });
+        }
+      } catch (err) {
+        console.error("[calendar] No se pudieron obtener los horarios:", err);
+        setTyping(false);
+        addMsg({
+          role: "bot",
+          text: "Tuve un problema al consultar la agenda. Un asesor se va a contactar con vos para coordinar la visita. ¡Gracias!",
+        });
+        setDone(true);
+      }
+    },
+    [addMsg],
+  );
+
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
