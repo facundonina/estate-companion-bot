@@ -18,6 +18,10 @@ export interface LeadSheetPayload {
   urgencia?: string;
   financiamiento?: string;
   prioridad?: string;
+  /** Propiedad puntual que está consultando el lead. */
+  propiedad?: string;
+  propiedadId?: number;
+  propiedadLink?: string;
 }
 
 export async function sendLeadToSheet(lead: LeadSheetPayload) {
@@ -27,6 +31,9 @@ export async function sendLeadToSheet(lead: LeadSheetPayload) {
     telefono: lead.telefono ?? "",
     email: lead.email ?? "",
     mensaje: lead.mensaje ?? "",
+    propiedad: lead.propiedad ?? "",
+    propiedadId: lead.propiedadId ?? "",
+    propiedadLink: lead.propiedadLink ?? "",
     zona: lead.zona ?? "",
     tipo: lead.tipo ?? "",
     dormitorios: lead.dormitorios ?? "",
