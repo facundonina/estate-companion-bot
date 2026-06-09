@@ -684,27 +684,38 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
       </div>
 
       {/* Input */}
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          handleSend(input);
-        }}
-        className="flex items-center gap-2 border-t border-border p-2.5"
-      >
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Escribí tu mensaje..."
-          className="flex-1 rounded-full border border-border bg-secondary px-3.5 py-2 text-[13px] text-foreground outline-none focus:border-primary"
-        />
-        <button
-          type="submit"
-          aria-label="Enviar"
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-opacity hover:opacity-90"
+      {slotConfirmed ? (
+        <div className="border-t border-border p-3.5 text-center">
+          <p className="text-[13px] font-medium text-foreground">
+            ✅ Visita confirmada
+          </p>
+          <p className="mt-0.5 text-[12px] text-muted-foreground">
+            Esta conversación quedó cerrada. ¡Nos vemos en la visita!
+          </p>
+        </div>
+      ) : (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleSend(input);
+          }}
+          className="flex items-center gap-2 border-t border-border p-2.5"
         >
-          <Send size={15} />
-        </button>
-      </form>
+          <input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Escribí tu mensaje..."
+            className="flex-1 rounded-full border border-border bg-secondary px-3.5 py-2 text-[13px] text-foreground outline-none focus:border-primary"
+          />
+          <button
+            type="submit"
+            aria-label="Enviar"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-opacity hover:opacity-90"
+          >
+            <Send size={15} />
+          </button>
+        </form>
+      )}
     </div>
   );
 }
