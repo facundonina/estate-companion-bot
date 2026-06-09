@@ -103,20 +103,7 @@ function calcPrioridad(lead: BotLeadState): string {
   return "Baja";
 }
 
-function buildSlots(): Slot[] {
-  const today = new Date();
-  const dias = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
-  const meses = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
-  const slots: Slot[] = [];
-  for (let i = 1; i <= 3; i++) {
-    const d = new Date(today);
-    d.setDate(d.getDate() + i);
-    const label = `${dias[d.getDay()]} ${d.getDate()} ${meses[d.getMonth()]}`;
-    slots.push({ label, time: "10:00 hs", id: `s${i}a` });
-    slots.push({ label, time: "16:00 hs", id: `s${i}b` });
-  }
-  return slots;
-}
+
 
 function PropertyCardBubble({ p }: { p: Property }) {
   const isLand = p.tipo === "Lote" || p.tipo === "Campo";
