@@ -202,7 +202,7 @@ function PropertyDetail() {
               {formatPrice(p.precio, p.moneda)}
             </p>
 
-            <div class="my-5 border-t border-border" />
+            <div className="my-5 border-t border-border" />
 
             <p className="text-sm font-semibold text-foreground">
               Asesor a cargo
