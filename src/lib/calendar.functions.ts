@@ -161,14 +161,33 @@ export const createCalendarEvent = createServerFn({ method: "POST" })
       data.email ? `Email del cliente: ${data.email}` : null,
     ].filter(Boolean);
 
-    const event = {
+    const event: Record<string, unknown> = {
       summary: `Visita de propiedad - ${data.cliente}`,
       description: descripcionLineas.join("\n"),
       start: { dateTime: data.startISO, timeZone: TIME_ZONE },
       end: { dateTime: data.endISO, timeZone: TIME_ZONE },
+      // Solicita la creación de una videollamada de Google Meet.
+      conferenceData: {
+        createRequest: {
+          requestId: `meet-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          conferenceSolutionKey: { type: "hangoutsMeet" },
+        },
+      },
     };
 
-    const res = await fetch(`${GATEWAY_URL}/calendars/primary/events`, {
+    // Si el lead dejó su email, lo agregamos como invitado para que reciba
+    // la invitación (y el link de Meet) por correo.
+    if (data.email) {
+      event.attendees = [{ email: data.email }];
+    }
+
+    // conferenceDataVersion=1 habilita la creación del Meet.
+    // sendUpdates=all hace que Google envíe el email de invitación a los invitados.
+    const url =
+      `${GATEWAY_URL}/calendars/primary/events` +
+      `?conferenceDataVersion=1&sendUpdates=all`;
+
+    const res = await fetch(url, {
       method: "POST",
       headers: gatewayHeaders(),
       body: JSON.stringify(event),
@@ -177,6 +196,15 @@ export const createCalendarEvent = createServerFn({ method: "POST" })
       const body = await res.text();
       throw new Error(`Google Calendar (events.insert) ${res.status}: ${body}`);
     }
-    const created = (await res.json()) as { id?: string; htmlLink?: string };
-    return { ok: true as const, id: created.id, htmlLink: created.htmlLink };
+    const created = (await res.json()) as {
+      id?: string;
+      htmlLink?: string;
+      hangoutLink?: string;
+    };
+    return {
+      ok: true as const,
+      id: created.id,
+      htmlLink: created.htmlLink,
+      meetLink: created.hangoutLink,
+    };
   });
