@@ -548,6 +548,7 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
       });
       setTyping(false);
       setSlotConfirmed(true);
+      confirmedSlotRef.current = selectedSlot;
       addMsg({
         role: "bot",
         text: `¡Listo! Tu visita quedó confirmada para el ${selectedSlot.label} a las ${selectedSlot.time}. Vas a recibir la confirmación por email${
