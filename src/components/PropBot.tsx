@@ -586,8 +586,7 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
   }, [addMsg, botReply, confirming, recommendProps, selectedSlot, slotConfirmed]);
 
   // El usuario eligió "Me interesa también" sobre una recomendación.
-  // Reutilizamos sus datos ya recolectados: enviamos el lead con la nueva
-  // propiedad y volvemos a abrir la agenda, sin repetir las preguntas.
+  // Reutilizamos sus datos ya recolectados (no volvemos a preguntar).
   const expressInterest = useCallback(
     async (p: Property) => {
       if (typing || confirming) return;
@@ -596,18 +595,34 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
         text: `Me interesa también: ${p.tipo} en ${p.barrio}`,
       });
       activePropRef.current = p;
+      void sendLeadToSheet(leadPayload(leadRef.current, p));
+
+      // Si ya hay un horario confirmado, sumamos esta propiedad a la MISMA
+      // reunión: es un único encuentro con el asesor, así que no pedimos
+      // otro horario.
+      const slot = confirmedSlotRef.current;
+      if (slot) {
+        await botReply(
+          {
+            text: `¡Genial! Sumamos ${p.tipo} en ${p.barrio} a la misma reunión del ${slot.label} a las ${slot.time}. El asesor te va a mostrar todas las opciones en ese mismo encuentro. ¡Nos vemos!`,
+          },
+          900,
+        );
+        return;
+      }
+
+      // Si todavía no hay horario confirmado, abrimos la agenda.
       setSelectedSlot(null);
       setSlotConfirmed(false);
       setConfirming(false);
       setDone(false);
       setNotQualified(false);
-      void sendLeadToSheet(leadPayload(leadRef.current, p));
       stepRef.current = 4;
       await presentAgenda(
-        `¡Genial! Coordinemos también una visita para ${p.tipo} en ${p.barrio}. Elegí uno de los horarios disponibles:`,
+        `¡Genial! Coordinemos una visita para ${p.tipo} en ${p.barrio}. Elegí uno de los horarios disponibles:`,
       );
     },
-    [addMsg, confirming, presentAgenda, typing],
+    [addMsg, botReply, confirming, presentAgenda, typing],
   );
 
 
