@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Building2, Send, Calendar, Bath, BedDouble, Maximize } from "lucide-react";
 import { properties, type Property } from "@/data/properties";
-import { formatPrice, propertyTitle } from "@/lib/format";
+import { formatPrice } from "@/lib/format";
 import { propertyImage } from "@/lib/propertyImage";
 import { sendLeadToSheet } from "@/lib/leadSheet";
 import {
