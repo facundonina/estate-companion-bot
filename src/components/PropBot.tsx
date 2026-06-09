@@ -419,10 +419,12 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
               financiamiento: lead.financiamiento,
               prioridad: lead.prioridad,
             });
-            const top3 = similarProps();
+            const { cards: top3, expanded } = recommendProps();
             await botReply(
               {
-                text: "Estas son las opciones que mejor se ajustan a lo que buscás:",
+                text: expanded
+                  ? `No encontré propiedades exactas en ${lead.zona}, pero estas opciones cercanas pueden interesarte:`
+                  : "Estas son las opciones que mejor se ajustan a lo que buscás:",
                 cards: top3,
               },
               1000,
