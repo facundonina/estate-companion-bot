@@ -4,6 +4,7 @@ import { Building2, Send, ArrowRight, Bath, BedDouble, Maximize } from "lucide-r
 import { properties, type Property } from "@/data/properties";
 import { formatPrice } from "@/lib/format";
 import { propertyImage } from "@/lib/propertyImage";
+import { isAngryMessage, isAffirmative } from "@/lib/sentiment";
 
 type QuickReply = { label: string; value: string };
 
