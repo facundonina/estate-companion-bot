@@ -105,6 +105,7 @@ export function SearchBot() {
   const idRef = useRef(0);
   const scrollRef = useRef<HTMLDivElement>(null);
   const startedRef = useRef(false);
+  const awaitingHumanRef = useRef(false);
 
   const nextId = () => ++idRef.current;
 
