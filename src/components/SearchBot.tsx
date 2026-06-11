@@ -197,6 +197,43 @@ export function SearchBot() {
       addMsg({ role: "user", text });
       setInput("");
 
+      // ¿Estábamos esperando que confirme si quiere hablar con un humano?
+      if (awaitingHumanRef.current) {
+        awaitingHumanRef.current = false;
+        if (isAffirmative(text)) {
+          await botReply(
+            {
+              text: "Listo, le aviso a un asesor de nuestro equipo para que se comunique con vos a la brevedad. Si querés, dejame tu teléfono o email así te contactan más rápido. 🙌",
+            },
+            700,
+          );
+          return;
+        }
+        await botReply(
+          {
+            text: "¡Perfecto, seguimos por acá! 😊 Volvé a responder la última pregunta cuando quieras.",
+          },
+          600,
+        );
+        return;
+      }
+
+      // Detectar enojo / insultos y ofrecer ayuda humana.
+      if (isAngryMessage(text)) {
+        awaitingHumanRef.current = true;
+        await botReply(
+          {
+            text: "Tranquilo, te noto un poco frustrado 😟. ¿Querés que te ponga en contacto con un humano de nuestro equipo?",
+            quickReplies: [
+              { label: "Sí, hablar con un humano", value: "Sí" },
+              { label: "No, seguir acá", value: "No" },
+            ],
+          },
+          600,
+        );
+        return;
+      }
+
       const s = stateRef.current;
 
       switch (stepRef.current) {
