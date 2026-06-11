@@ -535,7 +535,6 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
       role: "user",
       text: `Confirmo la visita para el ${selectedSlot.label} a las ${selectedSlot.time}`,
     });
-    setTyping(true);
     try {
       await createCalendarEvent({
         data: {
@@ -548,15 +547,16 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
           email: leadRef.current.email,
         },
       });
-      setTyping(false);
       setSlotConfirmed(true);
       confirmedSlotRef.current = selectedSlot;
-      addMsg({
-        role: "bot",
-        text: `¡Listo! Tu visita quedó confirmada para el ${selectedSlot.label} a las ${selectedSlot.time}. Vas a recibir la confirmación por email${
-          leadRef.current.email ? ` a ${leadRef.current.email}` : ""
-        }. ¡Hasta pronto!`,
-      });
+      await botReply(
+        {
+          text: `¡Listo! Tu visita quedó confirmada para el ${selectedSlot.label} a las ${selectedSlot.time}. Vas a recibir la confirmación por email${
+            leadRef.current.email ? ` a ${leadRef.current.email}` : ""
+          }. ¡Hasta pronto!`,
+        },
+        800,
+      );
       setDone(true);
 
       // Una sola vez: ofrecemos otras propiedades que también podrían
@@ -578,12 +578,13 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
       }
     } catch (err) {
       console.error("[calendar] No se pudo crear el evento:", err);
-      setTyping(false);
       setConfirming(false);
-      addMsg({
-        role: "bot",
-        text: "Tuve un problema al confirmar la visita. Probá con otro horario o un asesor se va a contactar con vos para coordinarla.",
-      });
+      await botReply(
+        {
+          text: "Tuve un problema al confirmar la visita. Probá con otro horario o un asesor se va a contactar con vos para coordinarla.",
+        },
+        700,
+      );
     }
   }, [addMsg, botReply, confirming, recommendProps, selectedSlot, slotConfirmed]);
 
