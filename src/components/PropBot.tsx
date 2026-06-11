@@ -292,27 +292,29 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
       try {
         const slots = await getAvailableSlots();
         setAvailableSlots(slots);
-        setTyping(false);
         if (slots.length === 0) {
-          addMsg({
-            role: "bot",
-            text: "Por ahora no tengo horarios disponibles en los próximos días. Un asesor se va a contactar con vos para coordinar la visita. ¡Gracias!",
-          });
+          await botReply(
+            {
+              text: "Por ahora no tengo horarios disponibles en los próximos días. Un asesor se va a contactar con vos para coordinar la visita. ¡Gracias!",
+            },
+            800,
+          );
           setDone(true);
         } else {
-          addMsg({ role: "bot", text: intro, agenda: true });
+          await botReply({ text: intro, agenda: true }, 600);
         }
       } catch (err) {
         console.error("[calendar] No se pudieron obtener los horarios:", err);
-        setTyping(false);
-        addMsg({
-          role: "bot",
-          text: "Tuve un problema al consultar la agenda. Un asesor se va a contactar con vos para coordinar la visita. ¡Gracias!",
-        });
+        await botReply(
+          {
+            text: "Tuve un problema al consultar la agenda. Un asesor se va a contactar con vos para coordinar la visita. ¡Gracias!",
+          },
+          800,
+        );
         setDone(true);
       }
     },
-    [addMsg],
+    [botReply],
   );
 
   useEffect(() => {
