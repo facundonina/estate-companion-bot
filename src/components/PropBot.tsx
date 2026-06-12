@@ -646,7 +646,9 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
               await new Promise((r) => setTimeout(r, 400));
               await botReply(
                 {
-                  text: "Por ahora no tenemos propiedades que se ajusten a tu presupuesto y a lo que estás buscando. De todos modos, te invito a recorrer todo nuestro catálogo por si encontrás algo que te guste 👇",
+                  text: lead.zona
+                    ? `Por ahora en ${lead.zona} no tenemos propiedades que se ajusten a tu presupuesto. De todos modos, te invito a recorrer todo nuestro catálogo por si encontrás algo que te guste 👇`
+                    : "Por ahora no tenemos propiedades que se ajusten a tu presupuesto y a lo que estás buscando. De todos modos, te invito a recorrer todo nuestro catálogo por si encontrás algo que te guste 👇",
                   cta: { label: "Ver propiedades disponibles" },
                 },
                 900,
