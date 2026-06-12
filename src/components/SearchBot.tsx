@@ -4,6 +4,7 @@ import { Building2, Send, ArrowRight, Bath, BedDouble, Maximize } from "lucide-r
 import { properties, type Property } from "@/data/properties";
 import { formatPrice } from "@/lib/format";
 import { propertyImage } from "@/lib/propertyImage";
+import { parseBudget } from "@/lib/parseBudget";
 import { isAngryMessage, isAffirmative } from "@/lib/sentiment";
 
 type QuickReply = { label: string; value: string };
@@ -29,24 +30,8 @@ const DEPARTAMENTOS = Array.from(
   new Set(properties.map((p) => p.departamento)),
 ).sort();
 
-// Interpreta el presupuesto escrito a mano y lo convierte a dólares.
-function parseBudget(raw: string): number | null {
-  const t = raw.toLowerCase().trim();
-  const m = t.match(/([\d][\d.,]*)\s*(millones|mill[oó]n|mm|m|mil|k)?/);
-  if (!m) return null;
-  const numRaw = m[1];
-  const suf = m[2] || "";
-  let value: number;
-  if (suf === "mil" || suf === "k") {
-    value = parseFloat(numRaw.replace(/[.,]/g, "")) * 1000;
-  } else if (suf) {
-    value = parseFloat(numRaw.replace(",", ".")) * 1_000_000;
-  } else {
-    value = parseFloat(numRaw.replace(/[.,]/g, ""));
-  }
-  if (!Number.isFinite(value) || value <= 0) return null;
-  return Math.round(value);
-}
+
+
 
 function isLandTipo(tipo?: string) {
   return tipo === "Lote" || tipo === "Campo";
