@@ -591,16 +591,17 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
 
       switch (stepRef.current) {
         case 2: {
-          if (!URGENCIA_OPCIONES.includes(text)) {
+          const urgencia = matchUrgencia(text);
+          if (!urgencia) {
             await botReply(
               {
-                text: "No pude entender tu respuesta 🤔. Elegí una de las opciones para contarme cuándo necesitás concretar la compra.",
+                text: "No pude entender tu respuesta 🤔. Contame cuándo necesitás concretar la compra (por ejemplo: “lo antes posible”, “en unos meses” o “estoy explorando”).",
               },
               600,
             );
             return;
           }
-          lead.urgencia = text;
+          lead.urgencia = urgencia;
           stepRef.current = 3;
           await botReply(
             {
