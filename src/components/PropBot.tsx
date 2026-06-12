@@ -55,6 +55,160 @@ const FINANCIAMIENTO_OPCIONES = [
   "No lo definí todavía",
 ];
 
+// Normaliza texto: minúsculas y sin acentos, para comparar intención.
+function norm(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+}
+
+// Palabras clave que mapean texto libre del usuario a cada opción de urgencia.
+const URGENCIA_KEYWORDS: Record<string, string[]> = {
+  "Menos de 3 meses": [
+    "ya",
+    "cuanto antes",
+    "inmediato",
+    "inmediata",
+    "este mes",
+    "lo antes posible",
+    "urgente",
+    "ahora",
+    "proximos dias",
+    "en breve",
+    "enseguida",
+    "pronto",
+    "1 mes",
+    "un mes",
+    "2 meses",
+    "dos meses",
+    "3 meses",
+    "tres meses",
+    "uno a tres",
+    "1 a 3",
+    "corto plazo",
+  ],
+  "3 a 6 meses": [
+    "4 meses",
+    "cuatro meses",
+    "5 meses",
+    "cinco meses",
+    "6 meses",
+    "seis meses",
+    "medio ano",
+    "3 a 6",
+    "tres a seis",
+  ],
+  "En el año": [
+    "este ano",
+    "en el ano",
+    "dentro del ano",
+    "fin de ano",
+    "un ano",
+    "1 ano",
+    "12 meses",
+    "doce meses",
+  ],
+  "Estoy explorando": [
+    "explorando",
+    "mirando",
+    "viendo",
+    "no tengo apuro",
+    "sin apuro",
+    "largo plazo",
+    "mas adelante",
+    "evaluando",
+    "evaluando opciones",
+    "estoy evaluando",
+    "todavia no",
+    "no decidi",
+    "no me decidi",
+  ],
+};
+
+// Palabras clave que mapean texto libre a cada opción de financiamiento.
+const FINANCIAMIENTO_KEYWORDS: Record<string, string[]> = {
+  "Efectivo listo": [
+    "contado",
+    "al contado",
+    "efectivo",
+    "cash",
+    "ahorro",
+    "ahorros",
+    "fondos propios",
+    "dinero propio",
+    "plata propia",
+    "capital propio",
+    "pago total",
+    "pago completo",
+    "pago de una",
+    "tengo el dinero",
+    "dispongo del dinero",
+    "sin financiacion",
+    "sin credito",
+  ],
+  "Crédito hipotecario aprobado": [
+    "credito aprobado",
+    "aprobado",
+    "hipoteca aprobada",
+    "prestamo aprobado",
+    "credito otorgado",
+    "ya tengo el credito",
+    "tengo el credito",
+  ],
+  "Crédito en trámite": [
+    "credito hipotecario",
+    "credito",
+    "prestamo hipotecario",
+    "prestamo del banco",
+    "prestamo",
+    "hipoteca",
+    "banco",
+    "financiacion bancaria",
+    "financiamiento",
+    "financiar",
+    "voy a financiar",
+    "en tramite",
+    "tramite",
+    "tramitando",
+    "gestionando",
+  ],
+  "No lo definí todavía": [
+    "no se",
+    "no lo se",
+    "no defini",
+    "no decidi",
+    "todavia no",
+    "no estoy seguro",
+    "no sabria",
+    "ver opciones",
+  ],
+};
+
+// Dado un texto libre, lo asigna a la opción correspondiente según su
+// intención. Primero busca coincidencia exacta con una opción, luego por
+// palabras clave (respetando el orden de prioridad de las opciones).
+function matchOption(
+  raw: string,
+  options: string[],
+  keywords: Record<string, string[]>,
+): string | null {
+  const t = norm(raw);
+  for (const o of options) if (norm(o) === t) return o;
+  for (const o of options) {
+    for (const kw of keywords[o] || []) {
+      if (t.includes(norm(kw))) return o;
+    }
+  }
+  return null;
+}
+
+const matchUrgencia = (raw: string) =>
+  matchOption(raw, URGENCIA_OPCIONES, URGENCIA_KEYWORDS);
+const matchFinanciamiento = (raw: string) =>
+  matchOption(raw, FINANCIAMIENTO_OPCIONES, FINANCIAMIENTO_KEYWORDS);
+
 function scoreProp(p: Property, lead: BotLeadState): number {
   let s = 0;
   if (lead.zona && p.zona.toLowerCase().includes(lead.zona.toLowerCase())) s += 4;
