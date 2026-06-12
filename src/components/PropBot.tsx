@@ -5,6 +5,7 @@ import { properties, type Property } from "@/data/properties";
 import { formatPrice } from "@/lib/format";
 import { propertyImage } from "@/lib/propertyImage";
 import { sendLeadToSheet } from "@/lib/leadSheet";
+import { parseBudget } from "@/lib/parseBudget";
 import { isAngryMessage, isAffirmative } from "@/lib/sentiment";
 import {
   getAvailableSlots,
