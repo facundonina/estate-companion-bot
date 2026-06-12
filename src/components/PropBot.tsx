@@ -277,27 +277,8 @@ function calcPrioridad(lead: BotLeadState): string {
   return "Baja";
 }
 
-// Interpreta el presupuesto escrito a mano por el usuario y lo convierte
-// a un número en dólares. Soporta formatos como "90.000", "USD 120.000",
-// "80k", "100 mil", "1.8 millones", "1,8M", etc.
-function parseBudget(raw: string): number | null {
-  const t = raw.toLowerCase().trim();
-  const m = t.match(/([\d][\d.,]*)\s*(millones|mill[oó]n|mm|m|mil|k)?/);
-  if (!m) return null;
-  const numRaw = m[1];
-  const suf = m[2] || "";
-  let value: number;
-  if (suf === "mil" || suf === "k") {
-    value = parseFloat(numRaw.replace(/[.,]/g, "")) * 1000;
-  } else if (suf) {
-    // millones / m / mm
-    value = parseFloat(numRaw.replace(",", ".")) * 1_000_000;
-  } else {
-    value = parseFloat(numRaw.replace(/[.,]/g, ""));
-  }
-  if (!Number.isFinite(value) || value <= 0) return null;
-  return Math.round(value);
-}
+
+
 
 // Evalúa si el lead realmente califica para ESTA propiedad puntual.
 // Devuelve los motivos por los que NO calificaría (vacío = califica).
