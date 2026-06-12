@@ -621,16 +621,17 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
           return;
         }
         case 3: {
-          if (!FINANCIAMIENTO_OPCIONES.includes(text)) {
+          const financiamiento = matchFinanciamiento(text);
+          if (!financiamiento) {
             await botReply(
               {
-                text: "No pude entender tu respuesta 🤔. Elegí una de las opciones para contarme cómo pensás financiar la compra.",
+                text: "No pude entender tu respuesta 🤔. Contame cómo pensás financiar la compra (por ejemplo: “al contado” o “con crédito hipotecario”).",
               },
               600,
             );
             return;
           }
-          lead.financiamiento = text;
+          lead.financiamiento = financiamiento;
           stepRef.current = 5;
           await botReply(
             {
