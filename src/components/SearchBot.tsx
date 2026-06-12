@@ -4,6 +4,7 @@ import { Building2, Send, ArrowRight, Bath, BedDouble, Maximize } from "lucide-r
 import { properties, type Property } from "@/data/properties";
 import { formatPrice } from "@/lib/format";
 import { propertyImage } from "@/lib/propertyImage";
+import { isAngryMessage, isAffirmative } from "@/lib/sentiment";
 
 type QuickReply = { label: string; value: string };
 
@@ -105,6 +106,7 @@ export function SearchBot() {
   const idRef = useRef(0);
   const scrollRef = useRef<HTMLDivElement>(null);
   const startedRef = useRef(false);
+  const awaitingHumanRef = useRef(false);
 
   const nextId = () => ++idRef.current;
 
@@ -194,6 +196,43 @@ export function SearchBot() {
       if (!text || typing) return;
       addMsg({ role: "user", text });
       setInput("");
+
+      // ¿Estábamos esperando que confirme si quiere hablar con un humano?
+      if (awaitingHumanRef.current) {
+        awaitingHumanRef.current = false;
+        if (isAffirmative(text)) {
+          await botReply(
+            {
+              text: "Listo, le aviso a un asesor de nuestro equipo para que se comunique con vos a la brevedad. Si querés, dejame tu teléfono o email así te contactan más rápido. 🙌",
+            },
+            700,
+          );
+          return;
+        }
+        await botReply(
+          {
+            text: "¡Perfecto, seguimos por acá! 😊 Volvé a responder la última pregunta cuando quieras.",
+          },
+          600,
+        );
+        return;
+      }
+
+      // Detectar enojo / insultos y ofrecer ayuda humana.
+      if (isAngryMessage(text)) {
+        awaitingHumanRef.current = true;
+        await botReply(
+          {
+            text: "Tranquilo, te noto un poco frustrado 😟. ¿Querés que te ponga en contacto con un humano de nuestro equipo?",
+            quickReplies: [
+              { label: "Sí, hablar con un humano", value: "Sí" },
+              { label: "No, seguir acá", value: "No" },
+            ],
+          },
+          600,
+        );
+        return;
+      }
 
       const s = stateRef.current;
 

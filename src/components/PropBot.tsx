@@ -5,6 +5,7 @@ import { properties, type Property } from "@/data/properties";
 import { formatPrice } from "@/lib/format";
 import { propertyImage } from "@/lib/propertyImage";
 import { sendLeadToSheet } from "@/lib/leadSheet";
+import { isAngryMessage, isAffirmative } from "@/lib/sentiment";
 import {
   getAvailableSlots,
   createCalendarEvent,
@@ -268,6 +269,7 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
   const idRef = useRef(0);
   const scrollRef = useRef<HTMLDivElement>(null);
   const startedRef = useRef(false);
+  const awaitingHumanRef = useRef(false);
 
   const nextId = () => ++idRef.current;
 
@@ -400,6 +402,44 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
       if (!text || typing) return;
       addMsg({ role: "user", text });
       setInput("");
+
+      // ¿Estábamos esperando que confirme si quiere hablar con un humano?
+      if (awaitingHumanRef.current) {
+        awaitingHumanRef.current = false;
+        if (isAffirmative(text)) {
+          await botReply(
+            {
+              text: "Listo, le aviso a un asesor de nuestro equipo para que se comunique con vos a la brevedad. ¡Gracias por tu paciencia! 🙌",
+            },
+            700,
+          );
+          return;
+        }
+        await botReply(
+          {
+            text: "¡Dale, seguimos por acá! 😊 Cuando quieras, respondé la última pregunta para continuar.",
+          },
+          600,
+        );
+        return;
+      }
+
+      // Detectar enojo / insultos y ofrecer ayuda humana.
+      if (isAngryMessage(text)) {
+        awaitingHumanRef.current = true;
+        await botReply(
+          {
+            text: "Tranquilo, te noto un poco frustrado 😟. ¿Querés que te ponga en contacto con un humano de nuestro equipo?",
+            quickReplies: [
+              { label: "Sí, hablar con un humano", value: "Sí" },
+              { label: "No, seguir acá", value: "No" },
+            ],
+          },
+          600,
+        );
+        return;
+      }
+
 
       if (done) {
         await botReply(
