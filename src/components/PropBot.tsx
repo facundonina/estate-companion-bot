@@ -237,32 +237,6 @@ interface BotLeadState extends BotLead {
   prioridad?: string;
 }
 
-// Mapa zona -> departamento, derivado de los datos reales.
-const ZONA_DEPT = new Map(properties.map((p) => [p.zona, p.departamento]));
-
-// Departamentos del "interior" que se consideran cercanos entre sí.
-const INTERIOR_DEPTS = ["Salto", "Paysandú", "Rivera", "Durazno"];
-
-// Dado el departamento de la zona elegida, devuelve los departamentos
-// considerados "cercanos" para expandir la búsqueda.
-function relatedDepts(dept?: string): string[] {
-  if (!dept) return [];
-  if (dept === "Montevideo") return ["Montevideo"];
-  if (dept === "Maldonado") return ["Maldonado"];
-  if (dept === "Canelones") return ["Canelones"];
-  if (dept === "Rocha") return ["Rocha"];
-  if (INTERIOR_DEPTS.includes(dept)) return INTERIOR_DEPTS;
-  return [];
-}
-
-// Una propiedad es "cercana" si está en un departamento relacionado con la
-// zona elegida, pero no es exactamente la misma zona.
-function isRelatedZona(p: Property, chosenZona?: string): boolean {
-  if (!chosenZona) return false;
-  const depts = relatedDepts(ZONA_DEPT.get(chosenZona));
-  return depts.includes(p.departamento) && p.zona !== chosenZona;
-}
-
 function calcPrioridad(lead: BotLeadState): string {
   const financiamiento = lead.financiamiento || "";
   const urgencia = lead.urgencia || "";
