@@ -466,6 +466,8 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
     const pool = properties.filter((x) => x.id !== activePropRef.current.id);
 
     const tipoOk = (p: Property) => !lead.tipo || p.tipo === lead.tipo;
+    // Solo recomendamos en la MISMA zona que está consultando el lead.
+    const zonaOk = (p: Property) => !lead.zona || p.zona === lead.zona;
     // El precio no puede superar el presupuesto del usuario (con un margen
     // chico del 10%). Nunca recomendamos propiedades fuera de su alcance.
     const budgetOk = (p: Property) =>
@@ -473,31 +475,19 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
     const sortTop = (arr: Property[]) =>
       [...arr].sort((a, b) => scoreProp(b, lead) - scoreProp(a, lead));
 
-    // Paso 1: zona exacta + filtros duros (tipo + presupuesto).
-    let expanded = false;
+    // Paso 1: misma zona + filtros duros (tipo + presupuesto).
     let filtered = pool.filter(
-      (p) => p.zona === lead.zona && tipoOk(p) && budgetOk(p),
+      (p) => zonaOk(p) && tipoOk(p) && budgetOk(p),
     );
 
-    // Paso 2: si hay menos de 3, expandir a zonas relacionadas.
+    // Paso 2: si hay menos de 3, relajar el tipo pero SIEMPRE respetando la
+    // misma zona y el presupuesto. Nunca cambiamos de zona ni recomendamos
+    // fuera del alcance del lead.
     if (filtered.length < 3) {
-      expanded = true;
-      filtered = pool.filter(
-        (p) =>
-          (p.zona === lead.zona || isRelatedZona(p, lead.zona)) &&
-          tipoOk(p) &&
-          budgetOk(p),
-      );
+      filtered = pool.filter((p) => zonaOk(p) && budgetOk(p));
     }
 
-    // Paso 3: si aún hay menos de 3, relajar el tipo pero SIEMPRE
-    // respetando el presupuesto. Nunca mostramos propiedades fuera de él.
-    if (filtered.length < 3) {
-      expanded = true;
-      filtered = pool.filter((p) => budgetOk(p));
-    }
-
-    return { cards: sortTop(filtered).slice(0, 3), expanded };
+    return { cards: sortTop(filtered).slice(0, 3), expanded: false };
   }, []);
 
   // Kick off the conversation once.
