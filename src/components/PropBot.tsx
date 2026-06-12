@@ -237,32 +237,6 @@ interface BotLeadState extends BotLead {
   prioridad?: string;
 }
 
-// Mapa zona -> departamento, derivado de los datos reales.
-const ZONA_DEPT = new Map(properties.map((p) => [p.zona, p.departamento]));
-
-// Departamentos del "interior" que se consideran cercanos entre sí.
-const INTERIOR_DEPTS = ["Salto", "Paysandú", "Rivera", "Durazno"];
-
-// Dado el departamento de la zona elegida, devuelve los departamentos
-// considerados "cercanos" para expandir la búsqueda.
-function relatedDepts(dept?: string): string[] {
-  if (!dept) return [];
-  if (dept === "Montevideo") return ["Montevideo"];
-  if (dept === "Maldonado") return ["Maldonado"];
-  if (dept === "Canelones") return ["Canelones"];
-  if (dept === "Rocha") return ["Rocha"];
-  if (INTERIOR_DEPTS.includes(dept)) return INTERIOR_DEPTS;
-  return [];
-}
-
-// Una propiedad es "cercana" si está en un departamento relacionado con la
-// zona elegida, pero no es exactamente la misma zona.
-function isRelatedZona(p: Property, chosenZona?: string): boolean {
-  if (!chosenZona) return false;
-  const depts = relatedDepts(ZONA_DEPT.get(chosenZona));
-  return depts.includes(p.departamento) && p.zona !== chosenZona;
-}
-
 function calcPrioridad(lead: BotLeadState): string {
   const financiamiento = lead.financiamiento || "";
   const urgencia = lead.urgencia || "";
@@ -466,6 +440,8 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
     const pool = properties.filter((x) => x.id !== activePropRef.current.id);
 
     const tipoOk = (p: Property) => !lead.tipo || p.tipo === lead.tipo;
+    // Solo recomendamos en la MISMA zona que está consultando el lead.
+    const zonaOk = (p: Property) => !lead.zona || p.zona === lead.zona;
     // El precio no puede superar el presupuesto del usuario (con un margen
     // chico del 10%). Nunca recomendamos propiedades fuera de su alcance.
     const budgetOk = (p: Property) =>
@@ -473,31 +449,19 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
     const sortTop = (arr: Property[]) =>
       [...arr].sort((a, b) => scoreProp(b, lead) - scoreProp(a, lead));
 
-    // Paso 1: zona exacta + filtros duros (tipo + presupuesto).
-    let expanded = false;
+    // Paso 1: misma zona + filtros duros (tipo + presupuesto).
     let filtered = pool.filter(
-      (p) => p.zona === lead.zona && tipoOk(p) && budgetOk(p),
+      (p) => zonaOk(p) && tipoOk(p) && budgetOk(p),
     );
 
-    // Paso 2: si hay menos de 3, expandir a zonas relacionadas.
+    // Paso 2: si hay menos de 3, relajar el tipo pero SIEMPRE respetando la
+    // misma zona y el presupuesto. Nunca cambiamos de zona ni recomendamos
+    // fuera del alcance del lead.
     if (filtered.length < 3) {
-      expanded = true;
-      filtered = pool.filter(
-        (p) =>
-          (p.zona === lead.zona || isRelatedZona(p, lead.zona)) &&
-          tipoOk(p) &&
-          budgetOk(p),
-      );
+      filtered = pool.filter((p) => zonaOk(p) && budgetOk(p));
     }
 
-    // Paso 3: si aún hay menos de 3, relajar el tipo pero SIEMPRE
-    // respetando el presupuesto. Nunca mostramos propiedades fuera de él.
-    if (filtered.length < 3) {
-      expanded = true;
-      filtered = pool.filter((p) => budgetOk(p));
-    }
-
-    return { cards: sortTop(filtered).slice(0, 3), expanded };
+    return { cards: sortTop(filtered).slice(0, 3), expanded: false };
   }, []);
 
   // Kick off the conversation once.
@@ -682,7 +646,9 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
               await new Promise((r) => setTimeout(r, 400));
               await botReply(
                 {
-                  text: "Por ahora no tenemos propiedades que se ajusten a tu presupuesto y a lo que estás buscando. De todos modos, te invito a recorrer todo nuestro catálogo por si encontrás algo que te guste 👇",
+                  text: lead.zona
+                    ? `Por ahora en ${lead.zona} no tenemos propiedades que se ajusten a tu presupuesto. De todos modos, te invito a recorrer todo nuestro catálogo por si encontrás algo que te guste 👇`
+                    : "Por ahora no tenemos propiedades que se ajusten a tu presupuesto y a lo que estás buscando. De todos modos, te invito a recorrer todo nuestro catálogo por si encontrás algo que te guste 👇",
                   cta: { label: "Ver propiedades disponibles" },
                 },
                 900,
