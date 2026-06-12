@@ -110,7 +110,7 @@ export function parseBudget(raw: string): number | null {
   const t = stripAccents(raw.toLowerCase()).trim();
 
   // Extrae todos los valores numéricos presentes (con sufijos opcionales).
-  const re = /(\d[\d.,]*)\s*(millones|millon|mm|m|mil|k)?/g;
+  const re = /(\d[\d.,]*)\s*(millones|millon|mil|mm|m|k)?/g;
   const values: number[] = [];
   let m: RegExpExecArray | null;
   while ((m = re.exec(t)) !== null) {
