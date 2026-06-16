@@ -265,25 +265,26 @@ export function SearchBot() {
 
       switch (stepRef.current) {
         case 1: {
-          let tipo =
-            TIPOS.find((t) => t.toLowerCase() === text.toLowerCase()) ?? null;
-          if (!tipo) {
-            setTyping(true);
-            try {
-              const res = await interpret({
-                data: {
-                  kind: "option",
-                  question: "¿Qué tipo de propiedad te interesa?",
-                  message: text,
-                  options: TIPOS,
-                },
-              });
-              tipo = res.option;
-            } catch (err) {
-              console.error("[SearchBot] interpret tipo:", err);
-            }
-            setTyping(false);
+          // La IA analiza la respuesta libre; coincidencia exacta de respaldo.
+          let tipo: string | null = null;
+          setTyping(true);
+          try {
+            const res = await interpret({
+              data: {
+                kind: "option",
+                question: "¿Qué tipo de propiedad te interesa?",
+                message: text,
+                options: TIPOS,
+              },
+            });
+            tipo = res.option;
+          } catch (err) {
+            console.error("[SearchBot] interpret tipo:", err);
           }
+          setTyping(false);
+          if (!tipo)
+            tipo =
+              TIPOS.find((t) => t.toLowerCase() === text.toLowerCase()) ?? null;
           if (!tipo) {
             await botSay(
               "No reconociste el tipo de propiedad que dijo el usuario. Pedile con amabilidad que elija uno de los tipos de la lista (botones debajo) para continuar.",
