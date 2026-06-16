@@ -789,13 +789,15 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
       });
       setSlotConfirmed(true);
       confirmedSlotRef.current = selectedSlot;
-      await botReply(
-        {
-          text: `¡Listo! Tu visita quedó confirmada para el ${selectedSlot.label} a las ${selectedSlot.time}. Vas a recibir la confirmación por email${
-            leadRef.current.email ? ` a ${leadRef.current.email}` : ""
-          }. ¡Hasta pronto!`,
-        },
-        800,
+      await botSay(
+        `Confirmá con entusiasmo que la visita quedó agendada para el ${selectedSlot.label} a las ${selectedSlot.time}, y avisá que recibirá la confirmación por email${
+          leadRef.current.email ? ` a ${leadRef.current.email}` : ""
+        }. Despedite cálidamente.`,
+        `¡Listo! Tu visita quedó confirmada para el ${selectedSlot.label} a las ${selectedSlot.time}. Vas a recibir la confirmación por email${
+          leadRef.current.email ? ` a ${leadRef.current.email}` : ""
+        }. ¡Hasta pronto!`,
+        {},
+        500,
       );
       setDone(true);
 
@@ -807,12 +809,10 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
         const { cards } = recommendProps();
         if (cards.length > 0) {
           await new Promise((r) => setTimeout(r, 600));
-          await botReply(
-            {
-              text: "Además, tengo estas otras propiedades que también podrían interesarte. Si alguna te gusta, tocá “Me interesa también” y coordinamos la visita 👇",
-              recCards: cards,
-            },
-            900,
+          await botSay(
+            "Comentale que además tenés estas otras propiedades que también podrían interesarle (se muestran como tarjetas debajo). Invitalo a tocar 'Me interesa también' si alguna le gusta para coordinar la visita.",
+            "Además, tengo estas otras propiedades que también podrían interesarte. Si alguna te gusta, tocá “Me interesa también” y coordinamos la visita 👇",
+            { recCards: cards },
           );
         }
       }
@@ -826,7 +826,7 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
         700,
       );
     }
-  }, [addMsg, botReply, confirming, recommendProps, selectedSlot, slotConfirmed]);
+  }, [addMsg, botReply, botSay, confirming, recommendProps, selectedSlot, slotConfirmed]);
 
   // El usuario eligió "Me interesa también" sobre una recomendación.
   // Reutilizamos sus datos ya recolectados (no volvemos a preguntar).
@@ -845,11 +845,11 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
       // otro horario.
       const slot = confirmedSlotRef.current;
       if (slot) {
-        await botReply(
-          {
-            text: `¡Genial! Sumamos ${p.tipo} en ${p.barrio} a la misma reunión del ${slot.label} a las ${slot.time}. El asesor te va a mostrar todas las opciones en ese mismo encuentro. ¡Nos vemos!`,
-          },
-          900,
+        await botSay(
+          `El usuario sumó ${p.tipo} en ${p.barrio} a su interés. Confirmale con entusiasmo que la van a sumar a la MISMA reunión del ${slot.label} a las ${slot.time}, donde el asesor le va a mostrar todas las opciones. Despedite.`,
+          `¡Genial! Sumamos ${p.tipo} en ${p.barrio} a la misma reunión del ${slot.label} a las ${slot.time}. El asesor te va a mostrar todas las opciones en ese mismo encuentro. ¡Nos vemos!`,
+          {},
+          500,
         );
         return;
       }
@@ -862,10 +862,11 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
       setNotQualified(false);
       stepRef.current = 4;
       await presentAgenda(
+        `El usuario se interesó en ${p.tipo} en ${p.barrio}. Proponele coordinar una visita para conocerla y pedile que elija uno de los horarios disponibles (se muestran como botones debajo).`,
         `¡Genial! Coordinemos una visita para ${p.tipo} en ${p.barrio}. Elegí uno de los horarios disponibles:`,
       );
     },
-    [addMsg, botReply, confirming, presentAgenda, typing],
+    [addMsg, botSay, confirming, presentAgenda, typing],
   );
 
 
