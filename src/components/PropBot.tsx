@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Link } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
+import { interpretAnswer } from "@/lib/botAi.functions";
 import { Building2, Send, Calendar, Bath, BedDouble, Maximize, ArrowRight } from "lucide-react";
 import { properties, type Property } from "@/data/properties";
 import { formatPrice } from "@/lib/format";
@@ -381,6 +383,8 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
   const startedRef = useRef(false);
   const awaitingHumanRef = useRef(false);
 
+  const interpret = useServerFn(interpretAnswer);
+
   const nextId = () => ++idRef.current;
 
   const addMsg = useCallback((msg: Omit<BotMessage, "id">) => {
@@ -555,7 +559,24 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
 
       switch (stepRef.current) {
         case 2: {
-          const urgencia = matchUrgencia(text);
+          let urgencia = matchUrgencia(text);
+          if (!urgencia) {
+            setTyping(true);
+            try {
+              const res = await interpret({
+                data: {
+                  kind: "option",
+                  question: "¿Cuándo necesitás concretar la compra?",
+                  message: text,
+                  options: URGENCIA_OPCIONES,
+                },
+              });
+              urgencia = res.option;
+            } catch (err) {
+              console.error("[PropBot] interpret urgencia:", err);
+            }
+            setTyping(false);
+          }
           if (!urgencia) {
             await botReply(
               {
@@ -585,7 +606,24 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
           return;
         }
         case 3: {
-          const financiamiento = matchFinanciamiento(text);
+          let financiamiento = matchFinanciamiento(text);
+          if (!financiamiento) {
+            setTyping(true);
+            try {
+              const res = await interpret({
+                data: {
+                  kind: "option",
+                  question: "¿Cómo pensás financiar la compra?",
+                  message: text,
+                  options: FINANCIAMIENTO_OPCIONES,
+                },
+              });
+              financiamiento = res.option;
+            } catch (err) {
+              console.error("[PropBot] interpret financiamiento:", err);
+            }
+            setTyping(false);
+          }
           if (!financiamiento) {
             await botReply(
               {
@@ -606,7 +644,24 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
           return;
         }
         case 5: {
-          const presupuesto = parseBudget(text);
+          let presupuesto = parseBudget(text);
+          if (presupuesto === null) {
+            setTyping(true);
+            try {
+              const res = await interpret({
+                data: {
+                  kind: "budget",
+                  question:
+                    "¿Cuál es tu presupuesto aproximado para esta compra?",
+                  message: text,
+                },
+              });
+              presupuesto = res.amount;
+            } catch (err) {
+              console.error("[PropBot] interpret presupuesto:", err);
+            }
+            setTyping(false);
+          }
           if (presupuesto === null) {
             await botReply(
               {
@@ -668,7 +723,7 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
         }
       }
     },
-    [addMsg, botReply, done, presentAgenda, property, recommendProps, typing],
+    [addMsg, botReply, done, interpret, presentAgenda, property, recommendProps, typing],
   );
 
   const confirmSlot = useCallback(async () => {

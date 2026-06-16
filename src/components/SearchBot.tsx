@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Link } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
+import { interpretAnswer } from "@/lib/botAi.functions";
 import { Building2, Send, ArrowRight, Bath, BedDouble, Maximize } from "lucide-react";
 import { properties, type Property } from "@/data/properties";
 import { formatPrice } from "@/lib/format";
@@ -92,6 +94,8 @@ export function SearchBot() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const startedRef = useRef(false);
   const awaitingHumanRef = useRef(false);
+
+  const interpret = useServerFn(interpretAnswer);
 
   const nextId = () => ++idRef.current;
 
@@ -223,7 +227,25 @@ export function SearchBot() {
 
       switch (stepRef.current) {
         case 1: {
-          const tipo = TIPOS.find((t) => t.toLowerCase() === text.toLowerCase());
+          let tipo =
+            TIPOS.find((t) => t.toLowerCase() === text.toLowerCase()) ?? null;
+          if (!tipo) {
+            setTyping(true);
+            try {
+              const res = await interpret({
+                data: {
+                  kind: "option",
+                  question: "¿Qué tipo de propiedad te interesa?",
+                  message: text,
+                  options: TIPOS,
+                },
+              });
+              tipo = res.option;
+            } catch (err) {
+              console.error("[SearchBot] interpret tipo:", err);
+            }
+            setTyping(false);
+          }
           if (!tipo) {
             await botReply(
               {
@@ -245,9 +267,26 @@ export function SearchBot() {
           return;
         }
         case 2: {
-          const dep = DEPARTAMENTOS.find(
-            (d) => d.toLowerCase() === text.toLowerCase(),
-          );
+          let dep =
+            DEPARTAMENTOS.find((d) => d.toLowerCase() === text.toLowerCase()) ??
+            null;
+          if (!dep) {
+            setTyping(true);
+            try {
+              const res = await interpret({
+                data: {
+                  kind: "option",
+                  question: "¿En qué departamento te gustaría?",
+                  message: text,
+                  options: DEPARTAMENTOS,
+                },
+              });
+              dep = res.option;
+            } catch (err) {
+              console.error("[SearchBot] interpret departamento:", err);
+            }
+            setTyping(false);
+          }
           if (!dep) {
             await botReply(
               {
@@ -284,8 +323,30 @@ export function SearchBot() {
           return;
         }
         case 3: {
+          let dormitorios: number | null = null;
           const n = parseInt(text, 10);
-          if (!Number.isFinite(n) || n <= 0) {
+          if (Number.isFinite(n) && n > 0) {
+            dormitorios = n;
+          } else {
+            setTyping(true);
+            try {
+              const res = await interpret({
+                data: {
+                  kind: "budget",
+                  question:
+                    "¿Cuántos dormitorios necesitás? Devolvé solo la cantidad como número.",
+                  message: text,
+                },
+              });
+              if (res.amount && res.amount > 0 && res.amount <= 20) {
+                dormitorios = Math.round(res.amount);
+              }
+            } catch (err) {
+              console.error("[SearchBot] interpret dormitorios:", err);
+            }
+            setTyping(false);
+          }
+          if (dormitorios === null) {
             await botReply(
               {
                 text: "No pude entender ese número 🤔. Decime cuántos dormitorios necesitás (por ejemplo: 1, 2 o 3).",
@@ -294,7 +355,7 @@ export function SearchBot() {
             );
             return;
           }
-          s.dormitorios = n;
+          s.dormitorios = dormitorios;
           stepRef.current = 4;
           await botReply(
             {
@@ -305,7 +366,23 @@ export function SearchBot() {
           return;
         }
         case 4: {
-          const presupuesto = parseBudget(text);
+          let presupuesto = parseBudget(text);
+          if (presupuesto === null) {
+            setTyping(true);
+            try {
+              const res = await interpret({
+                data: {
+                  kind: "budget",
+                  question: "¿Cuál es tu presupuesto aproximado?",
+                  message: text,
+                },
+              });
+              presupuesto = res.amount;
+            } catch (err) {
+              console.error("[SearchBot] interpret presupuesto:", err);
+            }
+            setTyping(false);
+          }
           if (presupuesto === null) {
             await botReply(
               {
@@ -331,7 +408,7 @@ export function SearchBot() {
         }
       }
     },
-    [addMsg, botReply, showResults, typing],
+    [addMsg, botReply, interpret, showResults, typing],
   );
 
   return (
