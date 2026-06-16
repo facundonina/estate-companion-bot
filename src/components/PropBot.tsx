@@ -687,24 +687,24 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
           return;
         }
         case 5: {
-          let presupuesto = parseBudget(text);
-          if (presupuesto === null) {
-            setTyping(true);
-            try {
-              const res = await interpret({
-                data: {
-                  kind: "budget",
-                  question:
-                    "¿Cuál es tu presupuesto aproximado para esta compra?",
-                  message: text,
-                },
-              });
-              presupuesto = res.amount;
-            } catch (err) {
-              console.error("[PropBot] interpret presupuesto:", err);
-            }
-            setTyping(false);
+          // La IA extrae el monto del presupuesto; parseo local de respaldo.
+          let presupuesto: number | null = null;
+          setTyping(true);
+          try {
+            const res = await interpret({
+              data: {
+                kind: "budget",
+                question:
+                  "¿Cuál es tu presupuesto aproximado para esta compra?",
+                message: text,
+              },
+            });
+            presupuesto = res.amount;
+          } catch (err) {
+            console.error("[PropBot] interpret presupuesto:", err);
           }
+          setTyping(false);
+          if (presupuesto === null) presupuesto = parseBudget(text);
           if (presupuesto === null) {
             await botSay(
               "No pudiste entender el monto del presupuesto. Pedile que lo escriba en dólares con un ejemplo (90.000 o USD 120.000).",
