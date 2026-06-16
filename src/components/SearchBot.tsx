@@ -408,7 +408,7 @@ export function SearchBot() {
         }
       }
     },
-    [addMsg, botReply, showResults, typing],
+    [addMsg, botReply, interpret, showResults, typing],
   );
 
   return (
