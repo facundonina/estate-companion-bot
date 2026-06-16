@@ -285,22 +285,18 @@ export function SearchBot() {
             setTyping(false);
           }
           if (!tipo) {
-            await botReply(
-              {
-                text: "No reconocí esa opción 🤔. Elegí uno de los tipos de propiedad de la lista para continuar.",
-              },
-              600,
+            await botSay(
+              "No reconociste el tipo de propiedad que dijo el usuario. Pedile con amabilidad que elija uno de los tipos de la lista (botones debajo) para continuar.",
+              "No reconocí esa opción 🤔. Elegí uno de los tipos de propiedad de la lista para continuar.",
             );
             return;
           }
           s.tipo = tipo;
           stepRef.current = 2;
-          await botReply(
-            {
-              text: "¡Buenísimo! ¿En qué departamento te gustaría?",
-              quickReplies: DEPARTAMENTOS.map((d) => ({ label: d, value: d })),
-            },
-            700,
+          await botSay(
+            `El usuario busca: ${tipo}. Reconocelo con entusiasmo y hacé UNA sola pregunta: en qué departamento le gustaría (las opciones aparecen como botones debajo).`,
+            "¡Buenísimo! ¿En qué departamento te gustaría?",
+            { quickReplies: DEPARTAMENTOS.map((d) => ({ label: d, value: d })) },
           );
           return;
         }
@@ -326,28 +322,25 @@ export function SearchBot() {
             setTyping(false);
           }
           if (!dep) {
-            await botReply(
-              {
-                text: "No reconocí ese departamento 🤔. Elegí uno de la lista para continuar.",
-              },
-              600,
+            await botSay(
+              "No reconociste el departamento que mencionó el usuario. Pedile que elija uno de la lista (botones debajo) para continuar.",
+              "No reconocí ese departamento 🤔. Elegí uno de la lista para continuar.",
             );
             return;
           }
           s.departamento = dep;
           if (isLandTipo(s.tipo)) {
             stepRef.current = 4;
-            await botReply(
-              {
-                text: "Perfecto. ¿Cuál es tu presupuesto aproximado? Escribilo en dólares (por ejemplo: 90.000 o USD 120.000).",
-              },
-              700,
+            await botSay(
+              `El usuario eligió el departamento de ${dep}. Como busca un terreno/campo, salteá los dormitorios y preguntale directamente cuál es su presupuesto aproximado, pidiéndolo en dólares con un ejemplo (90.000 o USD 120.000).`,
+              "Perfecto. ¿Cuál es tu presupuesto aproximado? Escribilo en dólares (por ejemplo: 90.000 o USD 120.000).",
             );
           } else {
             stepRef.current = 3;
-            await botReply(
+            await botSay(
+              `El usuario eligió el departamento de ${dep}. Hacé UNA sola pregunta: cuántos dormitorios necesita (las opciones aparecen como botones debajo).`,
+              "Perfecto. ¿Cuántos dormitorios necesitás?",
               {
-                text: "Perfecto. ¿Cuántos dormitorios necesitás?",
                 quickReplies: [
                   { label: "1 dormitorio", value: "1" },
                   { label: "2 dormitorios", value: "2" },
@@ -355,7 +348,6 @@ export function SearchBot() {
                   { label: "4 o más", value: "4" },
                 ],
               },
-              700,
             );
           }
           return;
@@ -385,21 +377,17 @@ export function SearchBot() {
             setTyping(false);
           }
           if (dormitorios === null) {
-            await botReply(
-              {
-                text: "No pude entender ese número 🤔. Decime cuántos dormitorios necesitás (por ejemplo: 1, 2 o 3).",
-              },
-              600,
+            await botSay(
+              "No entendiste cuántos dormitorios necesita el usuario. Pedile que te diga un número (por ejemplo: 1, 2 o 3).",
+              "No pude entender ese número 🤔. Decime cuántos dormitorios necesitás (por ejemplo: 1, 2 o 3).",
             );
             return;
           }
           s.dormitorios = dormitorios;
           stepRef.current = 4;
-          await botReply(
-            {
-              text: "¿Cuál es tu presupuesto aproximado? Escribilo en dólares (por ejemplo: 90.000 o USD 120.000).",
-            },
-            700,
+          await botSay(
+            `El usuario necesita ${dormitorios} dormitorio(s). Por último, preguntale cuál es su presupuesto aproximado, pidiéndolo en dólares con un ejemplo (90.000 o USD 120.000).`,
+            "¿Cuál es tu presupuesto aproximado? Escribilo en dólares (por ejemplo: 90.000 o USD 120.000).",
           );
           return;
         }
@@ -422,11 +410,9 @@ export function SearchBot() {
             setTyping(false);
           }
           if (presupuesto === null) {
-            await botReply(
-              {
-                text: "No pude entender ese monto 🤔. Escribí tu presupuesto en dólares, por ejemplo: 90.000 o USD 120.000.",
-              },
-              600,
+            await botSay(
+              "No pudiste entender el monto del presupuesto. Pedile que lo escriba en dólares con un ejemplo (90.000 o USD 120.000).",
+              "No pude entender ese monto 🤔. Escribí tu presupuesto en dólares, por ejemplo: 90.000 o USD 120.000.",
             );
             return;
           }
@@ -446,7 +432,7 @@ export function SearchBot() {
         }
       }
     },
-    [addMsg, botReply, interpret, showResults, typing],
+    [addMsg, botReply, botSay, interpret, showResults, typing],
   );
 
   return (
