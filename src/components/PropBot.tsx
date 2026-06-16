@@ -606,7 +606,24 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
           return;
         }
         case 3: {
-          const financiamiento = matchFinanciamiento(text);
+          let financiamiento = matchFinanciamiento(text);
+          if (!financiamiento) {
+            setTyping(true);
+            try {
+              const res = await interpret({
+                data: {
+                  kind: "option",
+                  question: "¿Cómo pensás financiar la compra?",
+                  message: text,
+                  options: FINANCIAMIENTO_OPCIONES,
+                },
+              });
+              financiamiento = res.option;
+            } catch (err) {
+              console.error("[PropBot] interpret financiamiento:", err);
+            }
+            setTyping(false);
+          }
           if (!financiamiento) {
             await botReply(
               {
