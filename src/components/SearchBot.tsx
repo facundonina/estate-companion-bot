@@ -96,12 +96,38 @@ export function SearchBot() {
   const awaitingHumanRef = useRef(false);
 
   const interpret = useServerFn(interpretAnswer);
+  const genMsg = useServerFn(generateBotMessage);
+
+  // Espejo del historial para enviarlo como contexto a la IA.
+  const messagesRef = useRef<BotMessage[]>([]);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   const nextId = () => ++idRef.current;
 
   const addMsg = useCallback((msg: Omit<BotMessage, "id">) => {
     setMessages((prev) => [...prev, { ...msg, id: nextId() }]);
   }, []);
+
+  // Pide a Gemini que redacte el próximo mensaje del bot según una instrucción
+  // interna. Si la IA falla o no está disponible, usa el texto de respaldo.
+  const phrase = useCallback(
+    async (instruction: string, fallback: string): Promise<string> => {
+      try {
+        const history = messagesRef.current
+          .filter((m) => m.text)
+          .slice(-12)
+          .map((m) => ({ role: m.role, text: m.text as string }));
+        const res = await genMsg({ data: { history, instruction } });
+        return (res?.text || "").trim() || fallback;
+      } catch (err) {
+        console.error("[SearchBot] generateBotMessage:", err);
+        return fallback;
+      }
+    },
+    [genMsg],
+  );
 
   const botReply = useCallback(
     async (msg: Omit<BotMessage, "id" | "role">, delay = 800) => {
@@ -111,6 +137,23 @@ export function SearchBot() {
       addMsg({ ...msg, role: "bot" });
     },
     [addMsg],
+  );
+
+  // Igual que botReply, pero el texto lo redacta Gemini (con fallback).
+  const botSay = useCallback(
+    async (
+      instruction: string,
+      fallback: string,
+      extra: Omit<BotMessage, "id" | "role" | "text"> = {},
+      delay = 350,
+    ) => {
+      setTyping(true);
+      const text = await phrase(instruction, fallback);
+      await new Promise((r) => setTimeout(r, delay));
+      setTyping(false);
+      addMsg({ role: "bot", text, ...extra });
+    },
+    [phrase, addMsg],
   );
 
   useEffect(() => {
