@@ -559,7 +559,24 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
 
       switch (stepRef.current) {
         case 2: {
-          const urgencia = matchUrgencia(text);
+          let urgencia = matchUrgencia(text);
+          if (!urgencia) {
+            setTyping(true);
+            try {
+              const res = await interpret({
+                data: {
+                  kind: "option",
+                  question: "¿Cuándo necesitás concretar la compra?",
+                  message: text,
+                  options: URGENCIA_OPCIONES,
+                },
+              });
+              urgencia = res.option;
+            } catch (err) {
+              console.error("[PropBot] interpret urgencia:", err);
+            }
+            setTyping(false);
+          }
           if (!urgencia) {
             await botReply(
               {
