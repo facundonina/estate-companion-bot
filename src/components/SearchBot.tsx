@@ -355,28 +355,28 @@ export function SearchBot() {
           return;
         }
         case 3: {
+          // La IA interpreta cuántos dormitorios; parseo numérico de respaldo.
           let dormitorios: number | null = null;
-          const n = parseInt(text, 10);
-          if (Number.isFinite(n) && n > 0) {
-            dormitorios = n;
-          } else {
-            setTyping(true);
-            try {
-              const res = await interpret({
-                data: {
-                  kind: "budget",
-                  question:
-                    "¿Cuántos dormitorios necesitás? Devolvé solo la cantidad como número.",
-                  message: text,
-                },
-              });
-              if (res.amount && res.amount > 0 && res.amount <= 20) {
-                dormitorios = Math.round(res.amount);
-              }
-            } catch (err) {
-              console.error("[SearchBot] interpret dormitorios:", err);
+          setTyping(true);
+          try {
+            const res = await interpret({
+              data: {
+                kind: "budget",
+                question:
+                  "¿Cuántos dormitorios necesitás? Devolvé solo la cantidad como número.",
+                message: text,
+              },
+            });
+            if (res.amount && res.amount > 0 && res.amount <= 20) {
+              dormitorios = Math.round(res.amount);
             }
-            setTyping(false);
+          } catch (err) {
+            console.error("[SearchBot] interpret dormitorios:", err);
+          }
+          setTyping(false);
+          if (dormitorios === null) {
+            const n = parseInt(text, 10);
+            if (Number.isFinite(n) && n > 0) dormitorios = n;
           }
           if (dormitorios === null) {
             await botSay(
