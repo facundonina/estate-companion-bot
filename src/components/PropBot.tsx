@@ -644,7 +644,24 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
           return;
         }
         case 5: {
-          const presupuesto = parseBudget(text);
+          let presupuesto = parseBudget(text);
+          if (presupuesto === null) {
+            setTyping(true);
+            try {
+              const res = await interpret({
+                data: {
+                  kind: "budget",
+                  question:
+                    "¿Cuál es tu presupuesto aproximado para esta compra?",
+                  message: text,
+                },
+              });
+              presupuesto = res.amount;
+            } catch (err) {
+              console.error("[PropBot] interpret presupuesto:", err);
+            }
+            setTyping(false);
+          }
           if (presupuesto === null) {
             await botReply(
               {
