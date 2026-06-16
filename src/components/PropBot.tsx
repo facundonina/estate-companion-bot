@@ -521,19 +521,20 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
     if (startedRef.current) return;
     startedRef.current = true;
     (async () => {
-      await botReply(
-        {
-          text: `¡Hola ${firstName(lead.nombre)}! Vi que te interesaste en esta propiedad:`,
-          card: property,
-        },
-        900,
+      const propDesc = `${property.tipo} en ${property.barrio}, ${property.departamento} (${formatPrice(property.precio, property.moneda)})`;
+      await botSay(
+        `Saludá a ${firstName(lead.nombre)} por su nombre y, con entusiasmo, contale que viste que se interesó en esta propiedad: ${propDesc}. Presentate brevemente como PropBot. No hagas preguntas todavía: la tarjeta de la propiedad se muestra debajo de tu mensaje.`,
+        `¡Hola ${firstName(lead.nombre)}! Vi que te interesaste en esta propiedad:`,
+        { card: property },
+        650,
       );
       leadRef.current.zona = property.zona;
       leadRef.current.tipo = property.tipo;
       await new Promise((r) => setTimeout(r, 300));
-      await botReply(
+      await botSay(
+        "Decile que, antes de coordinar la visita, te gustaría conocer un par de cosas para asegurarte de que sea la mejor opción para él/ella. Después hacé UNA sola pregunta: con qué urgencia o para cuándo necesita concretar la compra.",
+        "Genial. Antes de coordinar la visita, me gustaría conocer un par de cosas para asegurarme de que sea la mejor opción para vos. ¿Cuándo necesitás concretar la compra?",
         {
-          text: "Genial. Antes de coordinar la visita, me gustaría conocer un par de cosas para asegurarme de que sea la mejor opción para vos. ¿Cuándo necesitás concretar la compra?",
           quickReplies: [
             { label: "Menos de 3 meses", value: "Menos de 3 meses" },
             { label: "3 a 6 meses", value: "3 a 6 meses" },
@@ -541,7 +542,6 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
             { label: "Estoy explorando", value: "Estoy explorando" },
           ],
         },
-        800,
       );
       stepRef.current = 2;
     })();
