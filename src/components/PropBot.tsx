@@ -607,24 +607,25 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
 
       switch (stepRef.current) {
         case 2: {
-          let urgencia = matchUrgencia(text);
-          if (!urgencia) {
-            setTyping(true);
-            try {
-              const res = await interpret({
-                data: {
-                  kind: "option",
-                  question: "¿Cuándo necesitás concretar la compra?",
-                  message: text,
-                  options: URGENCIA_OPCIONES,
-                },
-              });
-              urgencia = res.option;
-            } catch (err) {
-              console.error("[PropBot] interpret urgencia:", err);
-            }
-            setTyping(false);
+          // La IA analiza la respuesta libre del usuario; las reglas locales
+          // quedan solo como respaldo si la IA no está disponible.
+          let urgencia: string | null = null;
+          setTyping(true);
+          try {
+            const res = await interpret({
+              data: {
+                kind: "option",
+                question: "¿Cuándo necesitás concretar la compra?",
+                message: text,
+                options: URGENCIA_OPCIONES,
+              },
+            });
+            urgencia = res.option;
+          } catch (err) {
+            console.error("[PropBot] interpret urgencia:", err);
           }
+          setTyping(false);
+          if (!urgencia) urgencia = matchUrgencia(text);
           if (!urgencia) {
             await botSay(
               "No entendiste la respuesta del usuario sobre la urgencia. Pedile con amabilidad que te aclare para cuándo necesita concretar la compra, dándole ejemplos como 'lo antes posible', 'en unos meses' o 'estoy explorando'.",
@@ -652,24 +653,24 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
           return;
         }
         case 3: {
-          let financiamiento = matchFinanciamiento(text);
-          if (!financiamiento) {
-            setTyping(true);
-            try {
-              const res = await interpret({
-                data: {
-                  kind: "option",
-                  question: "¿Cómo pensás financiar la compra?",
-                  message: text,
-                  options: FINANCIAMIENTO_OPCIONES,
-                },
-              });
-              financiamiento = res.option;
-            } catch (err) {
-              console.error("[PropBot] interpret financiamiento:", err);
-            }
-            setTyping(false);
+          // La IA interpreta la forma de financiamiento; reglas locales de respaldo.
+          let financiamiento: string | null = null;
+          setTyping(true);
+          try {
+            const res = await interpret({
+              data: {
+                kind: "option",
+                question: "¿Cómo pensás financiar la compra?",
+                message: text,
+                options: FINANCIAMIENTO_OPCIONES,
+              },
+            });
+            financiamiento = res.option;
+          } catch (err) {
+            console.error("[PropBot] interpret financiamiento:", err);
           }
+          setTyping(false);
+          if (!financiamiento) financiamiento = matchFinanciamiento(text);
           if (!financiamiento) {
             await botSay(
               "No entendiste cómo piensa financiar la compra. Pedile que te lo aclare, con ejemplos como 'al contado' o 'con crédito hipotecario'.",
@@ -686,24 +687,24 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
           return;
         }
         case 5: {
-          let presupuesto = parseBudget(text);
-          if (presupuesto === null) {
-            setTyping(true);
-            try {
-              const res = await interpret({
-                data: {
-                  kind: "budget",
-                  question:
-                    "¿Cuál es tu presupuesto aproximado para esta compra?",
-                  message: text,
-                },
-              });
-              presupuesto = res.amount;
-            } catch (err) {
-              console.error("[PropBot] interpret presupuesto:", err);
-            }
-            setTyping(false);
+          // La IA extrae el monto del presupuesto; parseo local de respaldo.
+          let presupuesto: number | null = null;
+          setTyping(true);
+          try {
+            const res = await interpret({
+              data: {
+                kind: "budget",
+                question:
+                  "¿Cuál es tu presupuesto aproximado para esta compra?",
+                message: text,
+              },
+            });
+            presupuesto = res.amount;
+          } catch (err) {
+            console.error("[PropBot] interpret presupuesto:", err);
           }
+          setTyping(false);
+          if (presupuesto === null) presupuesto = parseBudget(text);
           if (presupuesto === null) {
             await botSay(
               "No pudiste entender el monto del presupuesto. Pedile que lo escriba en dólares con un ejemplo (90.000 o USD 120.000).",

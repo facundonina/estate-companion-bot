@@ -265,25 +265,26 @@ export function SearchBot() {
 
       switch (stepRef.current) {
         case 1: {
-          let tipo =
-            TIPOS.find((t) => t.toLowerCase() === text.toLowerCase()) ?? null;
-          if (!tipo) {
-            setTyping(true);
-            try {
-              const res = await interpret({
-                data: {
-                  kind: "option",
-                  question: "¿Qué tipo de propiedad te interesa?",
-                  message: text,
-                  options: TIPOS,
-                },
-              });
-              tipo = res.option;
-            } catch (err) {
-              console.error("[SearchBot] interpret tipo:", err);
-            }
-            setTyping(false);
+          // La IA analiza la respuesta libre; coincidencia exacta de respaldo.
+          let tipo: string | null = null;
+          setTyping(true);
+          try {
+            const res = await interpret({
+              data: {
+                kind: "option",
+                question: "¿Qué tipo de propiedad te interesa?",
+                message: text,
+                options: TIPOS,
+              },
+            });
+            tipo = res.option;
+          } catch (err) {
+            console.error("[SearchBot] interpret tipo:", err);
           }
+          setTyping(false);
+          if (!tipo)
+            tipo =
+              TIPOS.find((t) => t.toLowerCase() === text.toLowerCase()) ?? null;
           if (!tipo) {
             await botSay(
               "No reconociste el tipo de propiedad que dijo el usuario. Pedile con amabilidad que elija uno de los tipos de la lista (botones debajo) para continuar.",
@@ -301,26 +302,27 @@ export function SearchBot() {
           return;
         }
         case 2: {
-          let dep =
-            DEPARTAMENTOS.find((d) => d.toLowerCase() === text.toLowerCase()) ??
-            null;
-          if (!dep) {
-            setTyping(true);
-            try {
-              const res = await interpret({
-                data: {
-                  kind: "option",
-                  question: "¿En qué departamento te gustaría?",
-                  message: text,
-                  options: DEPARTAMENTOS,
-                },
-              });
-              dep = res.option;
-            } catch (err) {
-              console.error("[SearchBot] interpret departamento:", err);
-            }
-            setTyping(false);
+          // La IA analiza el departamento; coincidencia exacta de respaldo.
+          let dep: string | null = null;
+          setTyping(true);
+          try {
+            const res = await interpret({
+              data: {
+                kind: "option",
+                question: "¿En qué departamento te gustaría?",
+                message: text,
+                options: DEPARTAMENTOS,
+              },
+            });
+            dep = res.option;
+          } catch (err) {
+            console.error("[SearchBot] interpret departamento:", err);
           }
+          setTyping(false);
+          if (!dep)
+            dep =
+              DEPARTAMENTOS.find((d) => d.toLowerCase() === text.toLowerCase()) ??
+              null;
           if (!dep) {
             await botSay(
               "No reconociste el departamento que mencionó el usuario. Pedile que elija uno de la lista (botones debajo) para continuar.",
@@ -353,28 +355,28 @@ export function SearchBot() {
           return;
         }
         case 3: {
+          // La IA interpreta cuántos dormitorios; parseo numérico de respaldo.
           let dormitorios: number | null = null;
-          const n = parseInt(text, 10);
-          if (Number.isFinite(n) && n > 0) {
-            dormitorios = n;
-          } else {
-            setTyping(true);
-            try {
-              const res = await interpret({
-                data: {
-                  kind: "budget",
-                  question:
-                    "¿Cuántos dormitorios necesitás? Devolvé solo la cantidad como número.",
-                  message: text,
-                },
-              });
-              if (res.amount && res.amount > 0 && res.amount <= 20) {
-                dormitorios = Math.round(res.amount);
-              }
-            } catch (err) {
-              console.error("[SearchBot] interpret dormitorios:", err);
+          setTyping(true);
+          try {
+            const res = await interpret({
+              data: {
+                kind: "budget",
+                question:
+                  "¿Cuántos dormitorios necesitás? Devolvé solo la cantidad como número.",
+                message: text,
+              },
+            });
+            if (res.amount && res.amount > 0 && res.amount <= 20) {
+              dormitorios = Math.round(res.amount);
             }
-            setTyping(false);
+          } catch (err) {
+            console.error("[SearchBot] interpret dormitorios:", err);
+          }
+          setTyping(false);
+          if (dormitorios === null) {
+            const n = parseInt(text, 10);
+            if (Number.isFinite(n) && n > 0) dormitorios = n;
           }
           if (dormitorios === null) {
             await botSay(
@@ -392,23 +394,23 @@ export function SearchBot() {
           return;
         }
         case 4: {
-          let presupuesto = parseBudget(text);
-          if (presupuesto === null) {
-            setTyping(true);
-            try {
-              const res = await interpret({
-                data: {
-                  kind: "budget",
-                  question: "¿Cuál es tu presupuesto aproximado?",
-                  message: text,
-                },
-              });
-              presupuesto = res.amount;
-            } catch (err) {
-              console.error("[SearchBot] interpret presupuesto:", err);
-            }
-            setTyping(false);
+          // La IA extrae el monto del presupuesto; parseo local de respaldo.
+          let presupuesto: number | null = null;
+          setTyping(true);
+          try {
+            const res = await interpret({
+              data: {
+                kind: "budget",
+                question: "¿Cuál es tu presupuesto aproximado?",
+                message: text,
+              },
+            });
+            presupuesto = res.amount;
+          } catch (err) {
+            console.error("[SearchBot] interpret presupuesto:", err);
           }
+          setTyping(false);
+          if (presupuesto === null) presupuesto = parseBudget(text);
           if (presupuesto === null) {
             await botSay(
               "No pudiste entender el monto del presupuesto. Pedile que lo escriba en dólares con un ejemplo (90.000 o USD 120.000).",
