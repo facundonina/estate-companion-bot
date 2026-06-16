@@ -626,19 +626,18 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
             setTyping(false);
           }
           if (!urgencia) {
-            await botReply(
-              {
-                text: "No pude entender tu respuesta 🤔. Contame cuándo necesitás concretar la compra (por ejemplo: “lo antes posible”, “en unos meses” o “estoy explorando”).",
-              },
-              600,
+            await botSay(
+              "No entendiste la respuesta del usuario sobre la urgencia. Pedile con amabilidad que te aclare para cuándo necesita concretar la compra, dándole ejemplos como 'lo antes posible', 'en unos meses' o 'estoy explorando'.",
+              "No pude entender tu respuesta 🤔. Contame cuándo necesitás concretar la compra (por ejemplo: “lo antes posible”, “en unos meses” o “estoy explorando”).",
             );
             return;
           }
           lead.urgencia = urgencia;
           stepRef.current = 3;
-          await botReply(
+          await botSay(
+            `Ya sabés que su urgencia es "${urgencia}". Reconocelo brevemente y hacé UNA sola pregunta: cómo piensa financiar la compra.`,
+            "¿Cómo pensás financiar la compra?",
             {
-              text: "¿Cómo pensás financiar la compra?",
               quickReplies: [
                 { label: "Efectivo listo", value: "Efectivo listo" },
                 {
@@ -649,7 +648,6 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
                 { label: "No lo definí todavía", value: "No lo definí todavía" },
               ],
             },
-            700,
           );
           return;
         }
@@ -673,21 +671,17 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
             setTyping(false);
           }
           if (!financiamiento) {
-            await botReply(
-              {
-                text: "No pude entender tu respuesta 🤔. Contame cómo pensás financiar la compra (por ejemplo: “al contado” o “con crédito hipotecario”).",
-              },
-              600,
+            await botSay(
+              "No entendiste cómo piensa financiar la compra. Pedile que te lo aclare, con ejemplos como 'al contado' o 'con crédito hipotecario'.",
+              "No pude entender tu respuesta 🤔. Contame cómo pensás financiar la compra (por ejemplo: “al contado” o “con crédito hipotecario”).",
             );
             return;
           }
           lead.financiamiento = financiamiento;
           stepRef.current = 5;
-          await botReply(
-            {
-              text: "Por último, ¿cuál es tu presupuesto aproximado para esta compra? Escribilo en dólares (por ejemplo: 90.000 o USD 120.000).",
-            },
-            700,
+          await botSay(
+            `Su método de financiamiento es "${financiamiento}". Por último, preguntale cuál es su presupuesto aproximado para esta compra, pidiéndole que lo escriba en dólares con un ejemplo de formato (90.000 o USD 120.000).`,
+            "Por último, ¿cuál es tu presupuesto aproximado para esta compra? Escribilo en dólares (por ejemplo: 90.000 o USD 120.000).",
           );
           return;
         }
@@ -711,11 +705,9 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
             setTyping(false);
           }
           if (presupuesto === null) {
-            await botReply(
-              {
-                text: "No pude entender ese monto 🤔. Escribí tu presupuesto en dólares, por ejemplo: 90.000 o USD 120.000.",
-              },
-              600,
+            await botSay(
+              "No pudiste entender el monto del presupuesto. Pedile que lo escriba en dólares con un ejemplo (90.000 o USD 120.000).",
+              "No pude entender ese monto 🤔. Escribí tu presupuesto en dólares, por ejemplo: 90.000 o USD 120.000.",
             );
             return;
           }
@@ -728,33 +720,33 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
           // Lo derivamos a ver opciones que sí encajan.
           if (!ok) {
             const { cards } = recommendProps();
-            await botReply(
-              {
-                text: `Gracias por contarme. Mirando lo que necesitás, ${reasons.join(
-                  " y ",
-                )}. Por eso esta propiedad no sería la mejor opción para vos.`,
-              },
-              1000,
+            await botSay(
+              `Agradecele que te contó sus datos. Con tacto y sin mencionar ninguna calificación interna, explicale que esta propiedad puntual no sería la mejor opción para él/ella por estos motivos: ${reasons.join(
+                " y ",
+              )}.`,
+              `Gracias por contarme. Mirando lo que necesitás, ${reasons.join(
+                " y ",
+              )}. Por eso esta propiedad no sería la mejor opción para vos.`,
+              {},
+              500,
             );
             if (cards.length > 0) {
               await new Promise((r) => setTimeout(r, 400));
-              await botReply(
-                {
-                  text: "Con tus preferencias, estas opciones sí encajan mejor. Si alguna te interesa, tocá “Me interesa también” y coordinamos la visita:",
-                  recCards: cards,
-                },
-                900,
+              await botSay(
+                "Presentale, con entusiasmo, estas otras opciones que sí encajan con su presupuesto y preferencias (se muestran como tarjetas debajo). Invitalo a tocar el botón 'Me interesa también' si alguna le gusta, para coordinar la visita.",
+                "Con tus preferencias, estas opciones sí encajan mejor. Si alguna te interesa, tocá “Me interesa también” y coordinamos la visita:",
+                { recCards: cards },
               );
             } else {
               await new Promise((r) => setTimeout(r, 400));
-              await botReply(
-                {
-                  text: lead.zona
-                    ? `Por ahora en ${lead.zona} no tenemos propiedades que se ajusten a tu presupuesto. De todos modos, te invito a recorrer todo nuestro catálogo por si encontrás algo que te guste 👇`
-                    : "Por ahora no tenemos propiedades que se ajusten a tu presupuesto y a lo que estás buscando. De todos modos, te invito a recorrer todo nuestro catálogo por si encontrás algo que te guste 👇",
-                  cta: { label: "Ver propiedades disponibles" },
-                },
-                900,
+              await botSay(
+                lead.zona
+                  ? `Explicale que por ahora en ${lead.zona} no tenés propiedades que se ajusten a su presupuesto, e invitalo a recorrer el catálogo completo por si encuentra algo que le guste. Debajo de tu mensaje hay un botón para verlo.`
+                  : "Explicale que por ahora no tenés propiedades que se ajusten a su presupuesto y a lo que busca, e invitalo a recorrer el catálogo completo. Debajo de tu mensaje hay un botón para verlo.",
+                lead.zona
+                  ? `Por ahora en ${lead.zona} no tenemos propiedades que se ajusten a tu presupuesto. De todos modos, te invito a recorrer todo nuestro catálogo por si encontrás algo que te guste 👇`
+                  : "Por ahora no tenemos propiedades que se ajusten a tu presupuesto y a lo que estás buscando. De todos modos, te invito a recorrer todo nuestro catálogo por si encontrás algo que te guste 👇",
+                { cta: { label: "Ver propiedades disponibles" } },
               );
             }
             setNotQualified(true);
@@ -765,13 +757,14 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
           void sendLeadToSheet(leadPayload(lead, activePropRef.current));
           stepRef.current = 4;
           await presentAgenda(
+            "El usuario calificó. Agradecele y proponele coordinar una visita presencial para conocer la propiedad. Pedile que elija uno de los horarios disponibles (se muestran como botones debajo).",
             "¡Gracias! Podemos coordinar una visita para que la conozcas en persona. Elegí uno de los horarios disponibles:",
           );
           return;
         }
       }
     },
-    [addMsg, botReply, done, interpret, presentAgenda, property, recommendProps, typing],
+    [addMsg, botReply, botSay, done, interpret, presentAgenda, property, recommendProps, typing],
   );
 
   const confirmSlot = useCallback(async () => {
