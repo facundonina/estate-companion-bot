@@ -178,22 +178,18 @@ export function SearchBot() {
       .slice(0, 4);
 
     if (matches.length === 0) {
-      await botReply(
-        {
-          text: "Por ahora no tengo propiedades que encajen con todo lo que buscás. Te invito a recorrer el catálogo completo, seguro encontrás algo que te guste 👇",
-          cta: true,
-        },
-        900,
+      await botSay(
+        "No encontraste propiedades que encajen con todo lo que busca el usuario. Decíselo con amabilidad e invitalo a recorrer el catálogo completo (hay un botón debajo de tu mensaje).",
+        "Por ahora no tengo propiedades que encajen con todo lo que buscás. Te invito a recorrer el catálogo completo, seguro encontrás algo que te guste 👇",
+        { cta: true },
       );
       return;
     }
 
-    await botReply(
-      {
-        text: "¡Encontré estas opciones que encajan con lo que buscás! Tocá la que más te guste para ver el detalle y dejar tus datos 👇",
-        cards: matches,
-      },
-      900,
+    await botSay(
+      "Encontraste opciones que encajan con lo que busca (se muestran como tarjetas debajo). Anunciáselo con entusiasmo e invitalo a tocar la que más le guste para ver el detalle y dejar sus datos.",
+      "¡Encontré estas opciones que encajan con lo que buscás! Tocá la que más te guste para ver el detalle y dejar tus datos 👇",
+      { cards: matches },
     );
     await new Promise((r) => setTimeout(r, 300));
     await botReply(
@@ -203,19 +199,18 @@ export function SearchBot() {
       },
       600,
     );
-  }, [botReply]);
+  }, [botReply, botSay]);
 
   // Inicio de la conversación.
   useEffect(() => {
     if (startedRef.current) return;
     startedRef.current = true;
     (async () => {
-      await botReply(
-        {
-          text: "¡Hola! 👋 Soy PropBot. Contame qué estás buscando y te ayudo a encontrar la propiedad ideal. Para empezar, ¿qué tipo de propiedad te interesa?",
-          quickReplies: TIPOS.map((t) => ({ label: t, value: t })),
-        },
-        700,
+      await botSay(
+        "Saludá al usuario, presentate como PropBot y contale que lo vas a ayudar a encontrar la propiedad ideal. Después hacé UNA sola pregunta: qué tipo de propiedad le interesa (las opciones aparecen como botones debajo).",
+        "¡Hola! 👋 Soy PropBot. Contame qué estás buscando y te ayudo a encontrar la propiedad ideal. Para empezar, ¿qué tipo de propiedad te interesa?",
+        { quickReplies: TIPOS.map((t) => ({ label: t, value: t })) },
+        500,
       );
       stepRef.current = 1;
     })();
