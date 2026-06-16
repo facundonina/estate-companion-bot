@@ -95,6 +95,8 @@ export function SearchBot() {
   const startedRef = useRef(false);
   const awaitingHumanRef = useRef(false);
 
+  const interpret = useServerFn(interpretAnswer);
+
   const nextId = () => ++idRef.current;
 
   const addMsg = useCallback((msg: Omit<BotMessage, "id">) => {
