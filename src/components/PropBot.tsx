@@ -653,24 +653,24 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
           return;
         }
         case 3: {
-          let financiamiento = matchFinanciamiento(text);
-          if (!financiamiento) {
-            setTyping(true);
-            try {
-              const res = await interpret({
-                data: {
-                  kind: "option",
-                  question: "¿Cómo pensás financiar la compra?",
-                  message: text,
-                  options: FINANCIAMIENTO_OPCIONES,
-                },
-              });
-              financiamiento = res.option;
-            } catch (err) {
-              console.error("[PropBot] interpret financiamiento:", err);
-            }
-            setTyping(false);
+          // La IA interpreta la forma de financiamiento; reglas locales de respaldo.
+          let financiamiento: string | null = null;
+          setTyping(true);
+          try {
+            const res = await interpret({
+              data: {
+                kind: "option",
+                question: "¿Cómo pensás financiar la compra?",
+                message: text,
+                options: FINANCIAMIENTO_OPCIONES,
+              },
+            });
+            financiamiento = res.option;
+          } catch (err) {
+            console.error("[PropBot] interpret financiamiento:", err);
           }
+          setTyping(false);
+          if (!financiamiento) financiamiento = matchFinanciamiento(text);
           if (!financiamiento) {
             await botSay(
               "No entendiste cómo piensa financiar la compra. Pedile que te lo aclare, con ejemplos como 'al contado' o 'con crédito hipotecario'.",
