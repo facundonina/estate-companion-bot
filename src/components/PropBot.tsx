@@ -446,8 +446,9 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
   );
 
   // Consulta Google Calendar y muestra los horarios disponibles como agenda.
+  // El texto introductorio lo redacta Gemini (con fallback).
   const presentAgenda = useCallback(
-    async (intro: string) => {
+    async (instruction: string, fallback: string) => {
       setTyping(true);
       try {
         const slots = await getAvailableSlots();
@@ -461,7 +462,10 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
           );
           setDone(true);
         } else {
-          await botReply({ text: intro, agenda: true }, 600);
+          const text = await phrase(instruction, fallback);
+          await new Promise((r) => setTimeout(r, 300));
+          setTyping(false);
+          addMsg({ role: "bot", text, agenda: true });
         }
       } catch (err) {
         console.error("[calendar] No se pudieron obtener los horarios:", err);
@@ -474,7 +478,7 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
         setDone(true);
       }
     },
-    [botReply],
+    [botReply, phrase, addMsg],
   );
 
   useEffect(() => {
