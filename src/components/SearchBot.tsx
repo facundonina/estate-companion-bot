@@ -302,26 +302,27 @@ export function SearchBot() {
           return;
         }
         case 2: {
-          let dep =
-            DEPARTAMENTOS.find((d) => d.toLowerCase() === text.toLowerCase()) ??
-            null;
-          if (!dep) {
-            setTyping(true);
-            try {
-              const res = await interpret({
-                data: {
-                  kind: "option",
-                  question: "¿En qué departamento te gustaría?",
-                  message: text,
-                  options: DEPARTAMENTOS,
-                },
-              });
-              dep = res.option;
-            } catch (err) {
-              console.error("[SearchBot] interpret departamento:", err);
-            }
-            setTyping(false);
+          // La IA analiza el departamento; coincidencia exacta de respaldo.
+          let dep: string | null = null;
+          setTyping(true);
+          try {
+            const res = await interpret({
+              data: {
+                kind: "option",
+                question: "¿En qué departamento te gustaría?",
+                message: text,
+                options: DEPARTAMENTOS,
+              },
+            });
+            dep = res.option;
+          } catch (err) {
+            console.error("[SearchBot] interpret departamento:", err);
           }
+          setTyping(false);
+          if (!dep)
+            dep =
+              DEPARTAMENTOS.find((d) => d.toLowerCase() === text.toLowerCase()) ??
+              null;
           if (!dep) {
             await botSay(
               "No reconociste el departamento que mencionó el usuario. Pedile que elija uno de la lista (botones debajo) para continuar.",
