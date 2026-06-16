@@ -607,24 +607,25 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
 
       switch (stepRef.current) {
         case 2: {
-          let urgencia = matchUrgencia(text);
-          if (!urgencia) {
-            setTyping(true);
-            try {
-              const res = await interpret({
-                data: {
-                  kind: "option",
-                  question: "¿Cuándo necesitás concretar la compra?",
-                  message: text,
-                  options: URGENCIA_OPCIONES,
-                },
-              });
-              urgencia = res.option;
-            } catch (err) {
-              console.error("[PropBot] interpret urgencia:", err);
-            }
-            setTyping(false);
+          // La IA analiza la respuesta libre del usuario; las reglas locales
+          // quedan solo como respaldo si la IA no está disponible.
+          let urgencia: string | null = null;
+          setTyping(true);
+          try {
+            const res = await interpret({
+              data: {
+                kind: "option",
+                question: "¿Cuándo necesitás concretar la compra?",
+                message: text,
+                options: URGENCIA_OPCIONES,
+              },
+            });
+            urgencia = res.option;
+          } catch (err) {
+            console.error("[PropBot] interpret urgencia:", err);
           }
+          setTyping(false);
+          if (!urgencia) urgencia = matchUrgencia(text);
           if (!urgencia) {
             await botSay(
               "No entendiste la respuesta del usuario sobre la urgencia. Pedile con amabilidad que te aclare para cuándo necesita concretar la compra, dándole ejemplos como 'lo antes posible', 'en unos meses' o 'estoy explorando'.",
