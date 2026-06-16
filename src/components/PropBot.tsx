@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { interpretAnswer } from "@/lib/botAi.functions";
+import { interpretAnswer, generateBotMessage } from "@/lib/botAi.functions";
 import { Building2, Send, Calendar, Bath, BedDouble, Maximize, ArrowRight } from "lucide-react";
 import { properties, type Property } from "@/data/properties";
 import { formatPrice } from "@/lib/format";
@@ -384,12 +384,38 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
   const awaitingHumanRef = useRef(false);
 
   const interpret = useServerFn(interpretAnswer);
+  const genMsg = useServerFn(generateBotMessage);
+
+  // Espejo del historial para enviarlo como contexto a la IA sin recrear callbacks.
+  const messagesRef = useRef<BotMessage[]>([]);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   const nextId = () => ++idRef.current;
 
   const addMsg = useCallback((msg: Omit<BotMessage, "id">) => {
     setMessages((prev) => [...prev, { ...msg, id: nextId() }]);
   }, []);
+
+  // Pide a Gemini que redacte el próximo mensaje del bot según una instrucción
+  // interna. Si la IA falla o no está disponible, usa el texto de respaldo.
+  const phrase = useCallback(
+    async (instruction: string, fallback: string): Promise<string> => {
+      try {
+        const history = messagesRef.current
+          .filter((m) => m.text)
+          .slice(-12)
+          .map((m) => ({ role: m.role, text: m.text as string }));
+        const res = await genMsg({ data: { history, instruction } });
+        return (res?.text || "").trim() || fallback;
+      } catch (err) {
+        console.error("[PropBot] generateBotMessage:", err);
+        return fallback;
+      }
+    },
+    [genMsg],
+  );
 
   const botReply = useCallback(
     async (msg: Omit<BotMessage, "id" | "role">, delay = 850) => {
@@ -401,9 +427,28 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
     [addMsg],
   );
 
+  // Igual que botReply, pero el texto lo redacta Gemini a partir de la
+  // instrucción (con fallback). Mantiene el indicador de "escribiendo".
+  const botSay = useCallback(
+    async (
+      instruction: string,
+      fallback: string,
+      extra: Omit<BotMessage, "id" | "role" | "text"> = {},
+      delay = 350,
+    ) => {
+      setTyping(true);
+      const text = await phrase(instruction, fallback);
+      await new Promise((r) => setTimeout(r, delay));
+      setTyping(false);
+      addMsg({ role: "bot", text, ...extra });
+    },
+    [phrase, addMsg],
+  );
+
   // Consulta Google Calendar y muestra los horarios disponibles como agenda.
+  // El texto introductorio lo redacta Gemini (con fallback).
   const presentAgenda = useCallback(
-    async (intro: string) => {
+    async (instruction: string, fallback: string) => {
       setTyping(true);
       try {
         const slots = await getAvailableSlots();
@@ -417,7 +462,10 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
           );
           setDone(true);
         } else {
-          await botReply({ text: intro, agenda: true }, 600);
+          const text = await phrase(instruction, fallback);
+          await new Promise((r) => setTimeout(r, 300));
+          setTyping(false);
+          addMsg({ role: "bot", text, agenda: true });
         }
       } catch (err) {
         console.error("[calendar] No se pudieron obtener los horarios:", err);
@@ -430,7 +478,7 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
         setDone(true);
       }
     },
-    [botReply],
+    [botReply, phrase, addMsg],
   );
 
   useEffect(() => {
@@ -473,19 +521,20 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
     if (startedRef.current) return;
     startedRef.current = true;
     (async () => {
-      await botReply(
-        {
-          text: `¡Hola ${firstName(lead.nombre)}! Vi que te interesaste en esta propiedad:`,
-          card: property,
-        },
-        900,
+      const propDesc = `${property.tipo} en ${property.barrio}, ${property.departamento} (${formatPrice(property.precio, property.moneda)})`;
+      await botSay(
+        `Saludá a ${firstName(lead.nombre)} por su nombre y, con entusiasmo, contale que viste que se interesó en esta propiedad: ${propDesc}. Presentate brevemente como PropBot. No hagas preguntas todavía: la tarjeta de la propiedad se muestra debajo de tu mensaje.`,
+        `¡Hola ${firstName(lead.nombre)}! Vi que te interesaste en esta propiedad:`,
+        { card: property },
+        650,
       );
       leadRef.current.zona = property.zona;
       leadRef.current.tipo = property.tipo;
       await new Promise((r) => setTimeout(r, 300));
-      await botReply(
+      await botSay(
+        "Decile que, antes de coordinar la visita, te gustaría conocer un par de cosas para asegurarte de que sea la mejor opción para él/ella. Después hacé UNA sola pregunta: con qué urgencia o para cuándo necesita concretar la compra.",
+        "Genial. Antes de coordinar la visita, me gustaría conocer un par de cosas para asegurarme de que sea la mejor opción para vos. ¿Cuándo necesitás concretar la compra?",
         {
-          text: "Genial. Antes de coordinar la visita, me gustaría conocer un par de cosas para asegurarme de que sea la mejor opción para vos. ¿Cuándo necesitás concretar la compra?",
           quickReplies: [
             { label: "Menos de 3 meses", value: "Menos de 3 meses" },
             { label: "3 a 6 meses", value: "3 a 6 meses" },
@@ -493,7 +542,6 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
             { label: "Estoy explorando", value: "Estoy explorando" },
           ],
         },
-        800,
       );
       stepRef.current = 2;
     })();
@@ -578,19 +626,18 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
             setTyping(false);
           }
           if (!urgencia) {
-            await botReply(
-              {
-                text: "No pude entender tu respuesta 🤔. Contame cuándo necesitás concretar la compra (por ejemplo: “lo antes posible”, “en unos meses” o “estoy explorando”).",
-              },
-              600,
+            await botSay(
+              "No entendiste la respuesta del usuario sobre la urgencia. Pedile con amabilidad que te aclare para cuándo necesita concretar la compra, dándole ejemplos como 'lo antes posible', 'en unos meses' o 'estoy explorando'.",
+              "No pude entender tu respuesta 🤔. Contame cuándo necesitás concretar la compra (por ejemplo: “lo antes posible”, “en unos meses” o “estoy explorando”).",
             );
             return;
           }
           lead.urgencia = urgencia;
           stepRef.current = 3;
-          await botReply(
+          await botSay(
+            `Ya sabés que su urgencia es "${urgencia}". Reconocelo brevemente y hacé UNA sola pregunta: cómo piensa financiar la compra.`,
+            "¿Cómo pensás financiar la compra?",
             {
-              text: "¿Cómo pensás financiar la compra?",
               quickReplies: [
                 { label: "Efectivo listo", value: "Efectivo listo" },
                 {
@@ -601,7 +648,6 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
                 { label: "No lo definí todavía", value: "No lo definí todavía" },
               ],
             },
-            700,
           );
           return;
         }
@@ -625,21 +671,17 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
             setTyping(false);
           }
           if (!financiamiento) {
-            await botReply(
-              {
-                text: "No pude entender tu respuesta 🤔. Contame cómo pensás financiar la compra (por ejemplo: “al contado” o “con crédito hipotecario”).",
-              },
-              600,
+            await botSay(
+              "No entendiste cómo piensa financiar la compra. Pedile que te lo aclare, con ejemplos como 'al contado' o 'con crédito hipotecario'.",
+              "No pude entender tu respuesta 🤔. Contame cómo pensás financiar la compra (por ejemplo: “al contado” o “con crédito hipotecario”).",
             );
             return;
           }
           lead.financiamiento = financiamiento;
           stepRef.current = 5;
-          await botReply(
-            {
-              text: "Por último, ¿cuál es tu presupuesto aproximado para esta compra? Escribilo en dólares (por ejemplo: 90.000 o USD 120.000).",
-            },
-            700,
+          await botSay(
+            `Su método de financiamiento es "${financiamiento}". Por último, preguntale cuál es su presupuesto aproximado para esta compra, pidiéndole que lo escriba en dólares con un ejemplo de formato (90.000 o USD 120.000).`,
+            "Por último, ¿cuál es tu presupuesto aproximado para esta compra? Escribilo en dólares (por ejemplo: 90.000 o USD 120.000).",
           );
           return;
         }
@@ -663,11 +705,9 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
             setTyping(false);
           }
           if (presupuesto === null) {
-            await botReply(
-              {
-                text: "No pude entender ese monto 🤔. Escribí tu presupuesto en dólares, por ejemplo: 90.000 o USD 120.000.",
-              },
-              600,
+            await botSay(
+              "No pudiste entender el monto del presupuesto. Pedile que lo escriba en dólares con un ejemplo (90.000 o USD 120.000).",
+              "No pude entender ese monto 🤔. Escribí tu presupuesto en dólares, por ejemplo: 90.000 o USD 120.000.",
             );
             return;
           }
@@ -680,33 +720,33 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
           // Lo derivamos a ver opciones que sí encajan.
           if (!ok) {
             const { cards } = recommendProps();
-            await botReply(
-              {
-                text: `Gracias por contarme. Mirando lo que necesitás, ${reasons.join(
-                  " y ",
-                )}. Por eso esta propiedad no sería la mejor opción para vos.`,
-              },
-              1000,
+            await botSay(
+              `Agradecele que te contó sus datos. Con tacto y sin mencionar ninguna calificación interna, explicale que esta propiedad puntual no sería la mejor opción para él/ella por estos motivos: ${reasons.join(
+                " y ",
+              )}.`,
+              `Gracias por contarme. Mirando lo que necesitás, ${reasons.join(
+                " y ",
+              )}. Por eso esta propiedad no sería la mejor opción para vos.`,
+              {},
+              500,
             );
             if (cards.length > 0) {
               await new Promise((r) => setTimeout(r, 400));
-              await botReply(
-                {
-                  text: "Con tus preferencias, estas opciones sí encajan mejor. Si alguna te interesa, tocá “Me interesa también” y coordinamos la visita:",
-                  recCards: cards,
-                },
-                900,
+              await botSay(
+                "Presentale, con entusiasmo, estas otras opciones que sí encajan con su presupuesto y preferencias (se muestran como tarjetas debajo). Invitalo a tocar el botón 'Me interesa también' si alguna le gusta, para coordinar la visita.",
+                "Con tus preferencias, estas opciones sí encajan mejor. Si alguna te interesa, tocá “Me interesa también” y coordinamos la visita:",
+                { recCards: cards },
               );
             } else {
               await new Promise((r) => setTimeout(r, 400));
-              await botReply(
-                {
-                  text: lead.zona
-                    ? `Por ahora en ${lead.zona} no tenemos propiedades que se ajusten a tu presupuesto. De todos modos, te invito a recorrer todo nuestro catálogo por si encontrás algo que te guste 👇`
-                    : "Por ahora no tenemos propiedades que se ajusten a tu presupuesto y a lo que estás buscando. De todos modos, te invito a recorrer todo nuestro catálogo por si encontrás algo que te guste 👇",
-                  cta: { label: "Ver propiedades disponibles" },
-                },
-                900,
+              await botSay(
+                lead.zona
+                  ? `Explicale que por ahora en ${lead.zona} no tenés propiedades que se ajusten a su presupuesto, e invitalo a recorrer el catálogo completo por si encuentra algo que le guste. Debajo de tu mensaje hay un botón para verlo.`
+                  : "Explicale que por ahora no tenés propiedades que se ajusten a su presupuesto y a lo que busca, e invitalo a recorrer el catálogo completo. Debajo de tu mensaje hay un botón para verlo.",
+                lead.zona
+                  ? `Por ahora en ${lead.zona} no tenemos propiedades que se ajusten a tu presupuesto. De todos modos, te invito a recorrer todo nuestro catálogo por si encontrás algo que te guste 👇`
+                  : "Por ahora no tenemos propiedades que se ajusten a tu presupuesto y a lo que estás buscando. De todos modos, te invito a recorrer todo nuestro catálogo por si encontrás algo que te guste 👇",
+                { cta: { label: "Ver propiedades disponibles" } },
               );
             }
             setNotQualified(true);
@@ -717,13 +757,14 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
           void sendLeadToSheet(leadPayload(lead, activePropRef.current));
           stepRef.current = 4;
           await presentAgenda(
+            "El usuario calificó. Agradecele y proponele coordinar una visita presencial para conocer la propiedad. Pedile que elija uno de los horarios disponibles (se muestran como botones debajo).",
             "¡Gracias! Podemos coordinar una visita para que la conozcas en persona. Elegí uno de los horarios disponibles:",
           );
           return;
         }
       }
     },
-    [addMsg, botReply, done, interpret, presentAgenda, property, recommendProps, typing],
+    [addMsg, botReply, botSay, done, interpret, presentAgenda, property, recommendProps, typing],
   );
 
   const confirmSlot = useCallback(async () => {
@@ -748,13 +789,15 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
       });
       setSlotConfirmed(true);
       confirmedSlotRef.current = selectedSlot;
-      await botReply(
-        {
-          text: `¡Listo! Tu visita quedó confirmada para el ${selectedSlot.label} a las ${selectedSlot.time}. Vas a recibir la confirmación por email${
-            leadRef.current.email ? ` a ${leadRef.current.email}` : ""
-          }. ¡Hasta pronto!`,
-        },
-        800,
+      await botSay(
+        `Confirmá con entusiasmo que la visita quedó agendada para el ${selectedSlot.label} a las ${selectedSlot.time}, y avisá que recibirá la confirmación por email${
+          leadRef.current.email ? ` a ${leadRef.current.email}` : ""
+        }. Despedite cálidamente.`,
+        `¡Listo! Tu visita quedó confirmada para el ${selectedSlot.label} a las ${selectedSlot.time}. Vas a recibir la confirmación por email${
+          leadRef.current.email ? ` a ${leadRef.current.email}` : ""
+        }. ¡Hasta pronto!`,
+        {},
+        500,
       );
       setDone(true);
 
@@ -766,12 +809,10 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
         const { cards } = recommendProps();
         if (cards.length > 0) {
           await new Promise((r) => setTimeout(r, 600));
-          await botReply(
-            {
-              text: "Además, tengo estas otras propiedades que también podrían interesarte. Si alguna te gusta, tocá “Me interesa también” y coordinamos la visita 👇",
-              recCards: cards,
-            },
-            900,
+          await botSay(
+            "Comentale que además tenés estas otras propiedades que también podrían interesarle (se muestran como tarjetas debajo). Invitalo a tocar 'Me interesa también' si alguna le gusta para coordinar la visita.",
+            "Además, tengo estas otras propiedades que también podrían interesarte. Si alguna te gusta, tocá “Me interesa también” y coordinamos la visita 👇",
+            { recCards: cards },
           );
         }
       }
@@ -785,7 +826,7 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
         700,
       );
     }
-  }, [addMsg, botReply, confirming, recommendProps, selectedSlot, slotConfirmed]);
+  }, [addMsg, botReply, botSay, confirming, recommendProps, selectedSlot, slotConfirmed]);
 
   // El usuario eligió "Me interesa también" sobre una recomendación.
   // Reutilizamos sus datos ya recolectados (no volvemos a preguntar).
@@ -804,11 +845,11 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
       // otro horario.
       const slot = confirmedSlotRef.current;
       if (slot) {
-        await botReply(
-          {
-            text: `¡Genial! Sumamos ${p.tipo} en ${p.barrio} a la misma reunión del ${slot.label} a las ${slot.time}. El asesor te va a mostrar todas las opciones en ese mismo encuentro. ¡Nos vemos!`,
-          },
-          900,
+        await botSay(
+          `El usuario sumó ${p.tipo} en ${p.barrio} a su interés. Confirmale con entusiasmo que la van a sumar a la MISMA reunión del ${slot.label} a las ${slot.time}, donde el asesor le va a mostrar todas las opciones. Despedite.`,
+          `¡Genial! Sumamos ${p.tipo} en ${p.barrio} a la misma reunión del ${slot.label} a las ${slot.time}. El asesor te va a mostrar todas las opciones en ese mismo encuentro. ¡Nos vemos!`,
+          {},
+          500,
         );
         return;
       }
@@ -821,10 +862,11 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
       setNotQualified(false);
       stepRef.current = 4;
       await presentAgenda(
+        `El usuario se interesó en ${p.tipo} en ${p.barrio}. Proponele coordinar una visita para conocerla y pedile que elija uno de los horarios disponibles (se muestran como botones debajo).`,
         `¡Genial! Coordinemos una visita para ${p.tipo} en ${p.barrio}. Elegí uno de los horarios disponibles:`,
       );
     },
-    [addMsg, botReply, confirming, presentAgenda, typing],
+    [addMsg, botSay, confirming, presentAgenda, typing],
   );
 
 

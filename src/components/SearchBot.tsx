@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { interpretAnswer } from "@/lib/botAi.functions";
+import { interpretAnswer, generateBotMessage } from "@/lib/botAi.functions";
 import { Building2, Send, ArrowRight, Bath, BedDouble, Maximize } from "lucide-react";
 import { properties, type Property } from "@/data/properties";
 import { formatPrice } from "@/lib/format";
@@ -96,12 +96,38 @@ export function SearchBot() {
   const awaitingHumanRef = useRef(false);
 
   const interpret = useServerFn(interpretAnswer);
+  const genMsg = useServerFn(generateBotMessage);
+
+  // Espejo del historial para enviarlo como contexto a la IA.
+  const messagesRef = useRef<BotMessage[]>([]);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   const nextId = () => ++idRef.current;
 
   const addMsg = useCallback((msg: Omit<BotMessage, "id">) => {
     setMessages((prev) => [...prev, { ...msg, id: nextId() }]);
   }, []);
+
+  // Pide a Gemini que redacte el próximo mensaje del bot según una instrucción
+  // interna. Si la IA falla o no está disponible, usa el texto de respaldo.
+  const phrase = useCallback(
+    async (instruction: string, fallback: string): Promise<string> => {
+      try {
+        const history = messagesRef.current
+          .filter((m) => m.text)
+          .slice(-12)
+          .map((m) => ({ role: m.role, text: m.text as string }));
+        const res = await genMsg({ data: { history, instruction } });
+        return (res?.text || "").trim() || fallback;
+      } catch (err) {
+        console.error("[SearchBot] generateBotMessage:", err);
+        return fallback;
+      }
+    },
+    [genMsg],
+  );
 
   const botReply = useCallback(
     async (msg: Omit<BotMessage, "id" | "role">, delay = 800) => {
@@ -111,6 +137,23 @@ export function SearchBot() {
       addMsg({ ...msg, role: "bot" });
     },
     [addMsg],
+  );
+
+  // Igual que botReply, pero el texto lo redacta Gemini (con fallback).
+  const botSay = useCallback(
+    async (
+      instruction: string,
+      fallback: string,
+      extra: Omit<BotMessage, "id" | "role" | "text"> = {},
+      delay = 350,
+    ) => {
+      setTyping(true);
+      const text = await phrase(instruction, fallback);
+      await new Promise((r) => setTimeout(r, delay));
+      setTyping(false);
+      addMsg({ role: "bot", text, ...extra });
+    },
+    [phrase, addMsg],
   );
 
   useEffect(() => {
@@ -135,22 +178,18 @@ export function SearchBot() {
       .slice(0, 4);
 
     if (matches.length === 0) {
-      await botReply(
-        {
-          text: "Por ahora no tengo propiedades que encajen con todo lo que buscás. Te invito a recorrer el catálogo completo, seguro encontrás algo que te guste 👇",
-          cta: true,
-        },
-        900,
+      await botSay(
+        "No encontraste propiedades que encajen con todo lo que busca el usuario. Decíselo con amabilidad e invitalo a recorrer el catálogo completo (hay un botón debajo de tu mensaje).",
+        "Por ahora no tengo propiedades que encajen con todo lo que buscás. Te invito a recorrer el catálogo completo, seguro encontrás algo que te guste 👇",
+        { cta: true },
       );
       return;
     }
 
-    await botReply(
-      {
-        text: "¡Encontré estas opciones que encajan con lo que buscás! Tocá la que más te guste para ver el detalle y dejar tus datos 👇",
-        cards: matches,
-      },
-      900,
+    await botSay(
+      "Encontraste opciones que encajan con lo que busca (se muestran como tarjetas debajo). Anunciáselo con entusiasmo e invitalo a tocar la que más le guste para ver el detalle y dejar sus datos.",
+      "¡Encontré estas opciones que encajan con lo que buscás! Tocá la que más te guste para ver el detalle y dejar tus datos 👇",
+      { cards: matches },
     );
     await new Promise((r) => setTimeout(r, 300));
     await botReply(
@@ -160,19 +199,18 @@ export function SearchBot() {
       },
       600,
     );
-  }, [botReply]);
+  }, [botReply, botSay]);
 
   // Inicio de la conversación.
   useEffect(() => {
     if (startedRef.current) return;
     startedRef.current = true;
     (async () => {
-      await botReply(
-        {
-          text: "¡Hola! 👋 Soy PropBot. Contame qué estás buscando y te ayudo a encontrar la propiedad ideal. Para empezar, ¿qué tipo de propiedad te interesa?",
-          quickReplies: TIPOS.map((t) => ({ label: t, value: t })),
-        },
-        700,
+      await botSay(
+        "Saludá al usuario, presentate como PropBot y contale que lo vas a ayudar a encontrar la propiedad ideal. Después hacé UNA sola pregunta: qué tipo de propiedad le interesa (las opciones aparecen como botones debajo).",
+        "¡Hola! 👋 Soy PropBot. Contame qué estás buscando y te ayudo a encontrar la propiedad ideal. Para empezar, ¿qué tipo de propiedad te interesa?",
+        { quickReplies: TIPOS.map((t) => ({ label: t, value: t })) },
+        500,
       );
       stepRef.current = 1;
     })();
@@ -247,22 +285,18 @@ export function SearchBot() {
             setTyping(false);
           }
           if (!tipo) {
-            await botReply(
-              {
-                text: "No reconocí esa opción 🤔. Elegí uno de los tipos de propiedad de la lista para continuar.",
-              },
-              600,
+            await botSay(
+              "No reconociste el tipo de propiedad que dijo el usuario. Pedile con amabilidad que elija uno de los tipos de la lista (botones debajo) para continuar.",
+              "No reconocí esa opción 🤔. Elegí uno de los tipos de propiedad de la lista para continuar.",
             );
             return;
           }
           s.tipo = tipo;
           stepRef.current = 2;
-          await botReply(
-            {
-              text: "¡Buenísimo! ¿En qué departamento te gustaría?",
-              quickReplies: DEPARTAMENTOS.map((d) => ({ label: d, value: d })),
-            },
-            700,
+          await botSay(
+            `El usuario busca: ${tipo}. Reconocelo con entusiasmo y hacé UNA sola pregunta: en qué departamento le gustaría (las opciones aparecen como botones debajo).`,
+            "¡Buenísimo! ¿En qué departamento te gustaría?",
+            { quickReplies: DEPARTAMENTOS.map((d) => ({ label: d, value: d })) },
           );
           return;
         }
@@ -288,28 +322,25 @@ export function SearchBot() {
             setTyping(false);
           }
           if (!dep) {
-            await botReply(
-              {
-                text: "No reconocí ese departamento 🤔. Elegí uno de la lista para continuar.",
-              },
-              600,
+            await botSay(
+              "No reconociste el departamento que mencionó el usuario. Pedile que elija uno de la lista (botones debajo) para continuar.",
+              "No reconocí ese departamento 🤔. Elegí uno de la lista para continuar.",
             );
             return;
           }
           s.departamento = dep;
           if (isLandTipo(s.tipo)) {
             stepRef.current = 4;
-            await botReply(
-              {
-                text: "Perfecto. ¿Cuál es tu presupuesto aproximado? Escribilo en dólares (por ejemplo: 90.000 o USD 120.000).",
-              },
-              700,
+            await botSay(
+              `El usuario eligió el departamento de ${dep}. Como busca un terreno/campo, salteá los dormitorios y preguntale directamente cuál es su presupuesto aproximado, pidiéndolo en dólares con un ejemplo (90.000 o USD 120.000).`,
+              "Perfecto. ¿Cuál es tu presupuesto aproximado? Escribilo en dólares (por ejemplo: 90.000 o USD 120.000).",
             );
           } else {
             stepRef.current = 3;
-            await botReply(
+            await botSay(
+              `El usuario eligió el departamento de ${dep}. Hacé UNA sola pregunta: cuántos dormitorios necesita (las opciones aparecen como botones debajo).`,
+              "Perfecto. ¿Cuántos dormitorios necesitás?",
               {
-                text: "Perfecto. ¿Cuántos dormitorios necesitás?",
                 quickReplies: [
                   { label: "1 dormitorio", value: "1" },
                   { label: "2 dormitorios", value: "2" },
@@ -317,7 +348,6 @@ export function SearchBot() {
                   { label: "4 o más", value: "4" },
                 ],
               },
-              700,
             );
           }
           return;
@@ -347,21 +377,17 @@ export function SearchBot() {
             setTyping(false);
           }
           if (dormitorios === null) {
-            await botReply(
-              {
-                text: "No pude entender ese número 🤔. Decime cuántos dormitorios necesitás (por ejemplo: 1, 2 o 3).",
-              },
-              600,
+            await botSay(
+              "No entendiste cuántos dormitorios necesita el usuario. Pedile que te diga un número (por ejemplo: 1, 2 o 3).",
+              "No pude entender ese número 🤔. Decime cuántos dormitorios necesitás (por ejemplo: 1, 2 o 3).",
             );
             return;
           }
           s.dormitorios = dormitorios;
           stepRef.current = 4;
-          await botReply(
-            {
-              text: "¿Cuál es tu presupuesto aproximado? Escribilo en dólares (por ejemplo: 90.000 o USD 120.000).",
-            },
-            700,
+          await botSay(
+            `El usuario necesita ${dormitorios} dormitorio(s). Por último, preguntale cuál es su presupuesto aproximado, pidiéndolo en dólares con un ejemplo (90.000 o USD 120.000).`,
+            "¿Cuál es tu presupuesto aproximado? Escribilo en dólares (por ejemplo: 90.000 o USD 120.000).",
           );
           return;
         }
@@ -384,11 +410,9 @@ export function SearchBot() {
             setTyping(false);
           }
           if (presupuesto === null) {
-            await botReply(
-              {
-                text: "No pude entender ese monto 🤔. Escribí tu presupuesto en dólares, por ejemplo: 90.000 o USD 120.000.",
-              },
-              600,
+            await botSay(
+              "No pudiste entender el monto del presupuesto. Pedile que lo escriba en dólares con un ejemplo (90.000 o USD 120.000).",
+              "No pude entender ese monto 🤔. Escribí tu presupuesto en dólares, por ejemplo: 90.000 o USD 120.000.",
             );
             return;
           }
@@ -408,7 +432,7 @@ export function SearchBot() {
         }
       }
     },
-    [addMsg, botReply, interpret, showResults, typing],
+    [addMsg, botReply, botSay, interpret, showResults, typing],
   );
 
   return (
