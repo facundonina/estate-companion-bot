@@ -203,3 +203,152 @@ export const interpretAnswer = createServerFn({ method: "POST" })
       return empty;
     }
   });
+
+// ===========================================================================
+// Extracción unificada: una sola llamada a Gemini interpreta el mensaje del
+// usuario (con el contexto de la conversación) y extrae TODOS los campos
+// disponibles a la vez. Permite que un mensaje libre como
+// "hola, quiero una casa de 3 dormitorios en Pocitos" complete varios pasos
+// del flujo de una sola vez. Toda la interpretación pasa por la IA.
+// ===========================================================================
+
+// Especificación de un campo a extraer.
+const fieldSpecSchema = z.object({
+  // Nombre interno del campo (clave del resultado).
+  name: z.string().min(1).max(40),
+  // "option" -> elegir una opción válida; "number"/"budget" -> número.
+  kind: z.enum(["option", "number", "budget"]),
+  // Qué representa el campo (contexto para la IA).
+  description: z.string().min(1).max(300),
+  // Opciones válidas (solo para kind === "option").
+  options: z.array(z.string()).max(12).optional(),
+});
+
+const extractInputSchema = z.object({
+  // Historial reciente de la conversación (contexto para la IA).
+  history: z
+    .array(
+      z.object({
+        role: z.enum(["bot", "user"]),
+        text: z.string().max(2000),
+      }),
+    )
+    .max(24),
+  // Último mensaje libre escrito por el usuario.
+  message: z.string().min(1).max(1000),
+  // Campos que se intentan extraer en esta llamada.
+  fields: z.array(fieldSpecSchema).min(1).max(8),
+});
+
+export interface ExtractResult {
+  // Mapa campo -> valor extraído (string para opciones, number para montos,
+  // null si la IA no pudo determinarlo a partir del mensaje).
+  values: Record<string, string | number | null>;
+}
+
+/**
+ * Interpreta el mensaje del usuario con Gemini (vía Lovable AI) y extrae, en
+ * una sola llamada, todos los campos indicados. Devuelve siempre un objeto
+ * seguro (nunca lanza al cliente). Si la IA falla, devuelve valores vacíos.
+ */
+export const extractFields = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => extractInputSchema.parse(data))
+  .handler(async ({ data }): Promise<ExtractResult> => {
+    const empty: ExtractResult = {
+      values: Object.fromEntries(data.fields.map((f) => [f.name, null])),
+    };
+
+    const apiKey = process.env.LOVABLE_API_KEY;
+    if (!apiKey) {
+      console.error("[botAi] Falta LOVABLE_API_KEY");
+      return empty;
+    }
+
+    try {
+      const { generateText, Output } = await import("ai");
+      const { createOpenAICompatible } = await import(
+        "@ai-sdk/openai-compatible"
+      );
+
+      const provider = createOpenAICompatible({
+        name: "lovable",
+        baseURL: "https://ai.gateway.lovable.dev/v1",
+        headers: {
+          "Lovable-API-Key": apiKey,
+          "X-Lovable-AIG-SDK": "vercel-ai-sdk",
+        },
+      });
+      const model = provider(GEMINI_MODEL);
+
+      // Esquema dinámico: una propiedad nullable por cada campo pedido.
+      const shape: Record<string, z.ZodTypeAny> = {};
+      for (const f of data.fields) {
+        shape[f.name] =
+          f.kind === "option"
+            ? z.string().nullable()
+            : z.number().nullable();
+      }
+      const schema = z.object(shape);
+
+      // Descripción legible de cada campo para guiar la extracción.
+      const fieldDocs = data.fields
+        .map((f) => {
+          if (f.kind === "option") {
+            const opts = (f.options ?? []).map((o) => `"${o}"`).join(", ");
+            return `- ${f.name}: ${f.description} Devolvé EXACTAMENTE una de estas opciones: ${opts}. Si no se puede determinar, devolvé null.`;
+          }
+          if (f.kind === "budget") {
+            return `- ${f.name}: ${f.description} Devolvé el monto entero en dólares (USD). Acepta formatos como "200000", "200.000", "USD 200.000", "200 mil", "doscientos mil", "hasta 250000", "entre 200000 y 250000" (tomá el máximo). Si no hay un monto razonable, devolvé null.`;
+          }
+          return `- ${f.name}: ${f.description} Devolvé solo el número. Si no se puede determinar, devolvé null.`;
+        })
+        .join("\n");
+
+      const historyMessages = data.history
+        .filter((m) => m.text.trim())
+        .map((m) => ({
+          role: (m.role === "user" ? "user" : "assistant") as
+            | "user"
+            | "assistant",
+          content: m.text,
+        }));
+
+      const { output } = await generateText({
+        model,
+        output: Output.object({ schema }),
+        system:
+          "Sos un asistente de una inmobiliaria uruguaya. Tu tarea es interpretar el último mensaje del usuario (usando el contexto de la conversación) y extraer los campos solicitados. Entendé lenguaje natural, sinónimos e intenciones implícitas (por ejemplo 'quiero una casa' -> tipo Casa). No inventes datos que el usuario no haya dado: si un campo no aparece o no es claro, devolvé null para ese campo.",
+        messages: [
+          ...historyMessages,
+          {
+            role: "user" as const,
+            content: `Campos a extraer:\n${fieldDocs}\n\nÚltimo mensaje del usuario: "${data.message}"`,
+          },
+        ],
+      });
+
+      // Normaliza la salida: valida opciones contra la lista y redondea montos.
+      const values: Record<string, string | number | null> = {};
+      for (const f of data.fields) {
+        const raw = (output as Record<string, unknown>)[f.name];
+        if (f.kind === "option") {
+          const picked = typeof raw === "string" ? raw.trim() : "";
+          const options = f.options ?? [];
+          const match = options.find(
+            (o) => o.toLowerCase() === picked.toLowerCase(),
+          );
+          values[f.name] = match ?? null;
+        } else {
+          const num =
+            typeof raw === "number" && Number.isFinite(raw) && raw > 0
+              ? Math.round(raw)
+              : null;
+          values[f.name] = num;
+        }
+      }
+      return { values };
+    } catch (err) {
+      console.error("[botAi] Error extrayendo campos:", err);
+      return empty;
+    }
+  });
