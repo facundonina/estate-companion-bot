@@ -11,7 +11,7 @@ import {
   Check,
   Phone,
 } from "lucide-react";
-import { properties } from "@/data/properties";
+import { properties, type Property } from "@/data/properties";
 import { formatPrice, propertyTitle } from "@/lib/format";
 import { propertyImage } from "@/lib/propertyImage";
 import { buildLongDescription } from "@/lib/description";
