@@ -935,8 +935,8 @@ export function PropBot({
         if (cards.length > 0) {
           await new Promise((r) => setTimeout(r, 600));
           await botSay(
-            "Comentale que además tenés estas otras propiedades que también podrían interesarle (se muestran como tarjetas debajo). Invitalo a tocar 'Me interesa también' si alguna le gusta para coordinar la visita.",
-            "Además, tengo estas otras propiedades que también podrían interesarte. Si alguna te gusta, tocá “Me interesa también” y coordinamos la visita 👇",
+            "Comentale que además tenés estas otras propiedades que también podrían interesarle (se muestran como tarjetas debajo). Invitalo a tocar 'Ver' en la que le guste para conocerla.",
+            "Además, tengo estas otras propiedades que también podrían interesarte. Tocá “Ver” en la que te guste para conocerla 👇",
             { recCards: cards },
           );
         }
