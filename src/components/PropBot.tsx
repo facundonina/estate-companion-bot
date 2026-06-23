@@ -549,6 +549,7 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
         },
       );
       stepRef.current = 2;
+      lastAskedRef.current = "urgencia";
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
