@@ -218,7 +218,7 @@ function PropertyDetail() {
             </p>
           </div>
 
-          <LeadForm property={p} />
+          <LeadSection property={p} />
         </aside>
       </div>
 
