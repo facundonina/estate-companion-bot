@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import type { Property } from "@/data/properties";
 import { propertyTitle } from "@/lib/format";
 import { PropBot } from "@/components/PropBot";
+import { setStoredLead } from "@/lib/leadStore";
 
 const leadSchema = z.object({
   nombre: z
