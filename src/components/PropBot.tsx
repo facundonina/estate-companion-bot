@@ -382,8 +382,13 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
   const scrollRef = useRef<HTMLDivElement>(null);
   const startedRef = useRef(false);
   const awaitingHumanRef = useRef(false);
+  // Último campo que el bot le pidió al usuario (para detectar respuestas
+  // que no aportan el dato esperado y pedir una aclaración).
+  const lastAskedRef = useRef<"urgencia" | "financiamiento" | "presupuesto" | null>(
+    null,
+  );
 
-  const interpret = useServerFn(interpretAnswer);
+  const extract = useServerFn(extractFields);
   const genMsg = useServerFn(generateBotMessage);
 
   // Espejo del historial para enviarlo como contexto a la IA sin recrear callbacks.
