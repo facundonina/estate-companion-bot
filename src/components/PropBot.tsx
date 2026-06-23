@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { interpretAnswer, generateBotMessage } from "@/lib/botAi.functions";
+import { extractFields, generateBotMessage } from "@/lib/botAi.functions";
 import { Building2, Send, Calendar, Bath, BedDouble, Maximize, ArrowRight } from "lucide-react";
 import { properties, type Property } from "@/data/properties";
 import { formatPrice } from "@/lib/format";
@@ -382,8 +382,13 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
   const scrollRef = useRef<HTMLDivElement>(null);
   const startedRef = useRef(false);
   const awaitingHumanRef = useRef(false);
+  // Último campo que el bot le pidió al usuario (para detectar respuestas
+  // que no aportan el dato esperado y pedir una aclaración).
+  const lastAskedRef = useRef<"urgencia" | "financiamiento" | "presupuesto" | null>(
+    null,
+  );
 
-  const interpret = useServerFn(interpretAnswer);
+  const extract = useServerFn(extractFields);
   const genMsg = useServerFn(generateBotMessage);
 
   // Espejo del historial para enviarlo como contexto a la IA sin recrear callbacks.
@@ -544,6 +549,7 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
         },
       );
       stepRef.current = 2;
+      lastAskedRef.current = "urgencia";
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -605,167 +611,184 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
 
       const lead = leadRef.current;
 
-      switch (stepRef.current) {
-        case 2: {
-          // La IA analiza la respuesta libre del usuario; las reglas locales
-          // quedan solo como respaldo si la IA no está disponible.
-          let urgencia: string | null = null;
-          setTyping(true);
-          try {
-            const res = await interpret({
-              data: {
-                kind: "option",
-                question: "¿Cuándo necesitás concretar la compra?",
-                message: text,
-                options: URGENCIA_OPCIONES,
-              },
-            });
-            urgencia = res.option;
-          } catch (err) {
-            console.error("[PropBot] interpret urgencia:", err);
-          }
-          setTyping(false);
-          if (!urgencia) urgencia = matchUrgencia(text);
-          if (!urgencia) {
-            await botSay(
-              "No entendiste la respuesta del usuario sobre la urgencia. Pedile con amabilidad que te aclare para cuándo necesita concretar la compra, dándole ejemplos como 'lo antes posible', 'en unos meses' o 'estoy explorando'.",
-              "No pude entender tu respuesta 🤔. Contame cuándo necesitás concretar la compra (por ejemplo: “lo antes posible”, “en unos meses” o “estoy explorando”).",
-            );
-            return;
-          }
-          lead.urgencia = urgencia;
-          stepRef.current = 3;
+      // Fase de recolección de datos de calificación (urgencia, financiamiento
+      // y presupuesto). La IA interpreta TODO el mensaje del usuario y extrae,
+      // de una sola vez, los datos que todavía falten.
+      if (
+        stepRef.current === 2 ||
+        stepRef.current === 3 ||
+        stepRef.current === 5
+      ) {
+        const fields: Array<{
+          name: string;
+          kind: "option" | "number" | "budget";
+          description: string;
+          options?: string[];
+        }> = [];
+        if (!lead.urgencia)
+          fields.push({
+            name: "urgencia",
+            kind: "option",
+            description:
+              "Con qué urgencia o para cuándo necesita concretar la compra.",
+            options: URGENCIA_OPCIONES,
+          });
+        if (!lead.financiamiento)
+          fields.push({
+            name: "financiamiento",
+            kind: "option",
+            description: "Cómo piensa financiar la compra.",
+            options: FINANCIAMIENTO_OPCIONES,
+          });
+        if (!lead.presupuesto)
+          fields.push({
+            name: "presupuesto",
+            kind: "budget",
+            description: "Presupuesto aproximado en dólares para esta compra.",
+          });
+
+        setTyping(true);
+        try {
+          const history = messagesRef.current
+            .filter((m) => m.text)
+            .slice(-12)
+            .map((m) => ({ role: m.role, text: m.text as string }));
+          const res = await extract({
+            data: { history, message: text, fields },
+          });
+          const v = res?.values ?? {};
+          if (typeof v.urgencia === "string") lead.urgencia = v.urgencia;
+          if (typeof v.financiamiento === "string")
+            lead.financiamiento = v.financiamiento;
+          if (typeof v.presupuesto === "number" && v.presupuesto > 0)
+            lead.presupuesto = v.presupuesto;
+        } catch (err) {
+          console.error("[PropBot] extract:", err);
+        }
+        setTyping(false);
+
+        // Respaldo local SOLO para el dato que se acaba de pedir, por si la IA
+        // no está disponible o no lo detectó.
+        const expected = lastAskedRef.current;
+        if (!lead.urgencia && expected === "urgencia") {
+          const u = matchUrgencia(text);
+          if (u) lead.urgencia = u;
+        }
+        if (!lead.financiamiento && expected === "financiamiento") {
+          const f = matchFinanciamiento(text);
+          if (f) lead.financiamiento = f;
+        }
+        if (!lead.presupuesto && expected === "presupuesto") {
+          const b = parseBudget(text);
+          if (b) lead.presupuesto = b;
+        }
+
+        const stillMissingExpected =
+          (expected === "urgencia" && !lead.urgencia) ||
+          (expected === "financiamiento" && !lead.financiamiento) ||
+          (expected === "presupuesto" && !lead.presupuesto);
+
+        // Próxima pregunta según el primer dato que falte.
+        if (!lead.urgencia) {
+          stepRef.current = 2;
+          lastAskedRef.current = "urgencia";
           await botSay(
-            `Ya sabés que su urgencia es "${urgencia}". Reconocelo brevemente y hacé UNA sola pregunta: cómo piensa financiar la compra.`,
-            "¿Cómo pensás financiar la compra?",
+            stillMissingExpected
+              ? "No entendiste la respuesta del usuario sobre la urgencia. Pedile con amabilidad que te aclare para cuándo necesita concretar la compra, dándole ejemplos como 'lo antes posible', 'en unos meses' o 'estoy explorando'."
+              : "Hacé UNA sola pregunta: con qué urgencia o para cuándo necesita concretar la compra (las opciones aparecen como botones debajo).",
+            "¿Cuándo necesitás concretar la compra?",
             {
-              quickReplies: [
-                { label: "Efectivo listo", value: "Efectivo listo" },
-                {
-                  label: "Crédito hipotecario aprobado",
-                  value: "Crédito hipotecario aprobado",
-                },
-                { label: "Crédito en trámite", value: "Crédito en trámite" },
-                { label: "No lo definí todavía", value: "No lo definí todavía" },
-              ],
+              quickReplies: URGENCIA_OPCIONES.map((o) => ({
+                label: o,
+                value: o,
+              })),
             },
           );
           return;
         }
-        case 3: {
-          // La IA interpreta la forma de financiamiento; reglas locales de respaldo.
-          let financiamiento: string | null = null;
-          setTyping(true);
-          try {
-            const res = await interpret({
-              data: {
-                kind: "option",
-                question: "¿Cómo pensás financiar la compra?",
-                message: text,
-                options: FINANCIAMIENTO_OPCIONES,
-              },
-            });
-            financiamiento = res.option;
-          } catch (err) {
-            console.error("[PropBot] interpret financiamiento:", err);
-          }
-          setTyping(false);
-          if (!financiamiento) financiamiento = matchFinanciamiento(text);
-          if (!financiamiento) {
-            await botSay(
-              "No entendiste cómo piensa financiar la compra. Pedile que te lo aclare, con ejemplos como 'al contado' o 'con crédito hipotecario'.",
-              "No pude entender tu respuesta 🤔. Contame cómo pensás financiar la compra (por ejemplo: “al contado” o “con crédito hipotecario”).",
-            );
-            return;
-          }
-          lead.financiamiento = financiamiento;
-          stepRef.current = 5;
+        if (!lead.financiamiento) {
+          stepRef.current = 3;
+          lastAskedRef.current = "financiamiento";
           await botSay(
-            `Su método de financiamiento es "${financiamiento}". Por último, preguntale cuál es su presupuesto aproximado para esta compra, pidiéndole que lo escriba en dólares con un ejemplo de formato (90.000 o USD 120.000).`,
+            stillMissingExpected
+              ? "No entendiste cómo piensa financiar la compra. Pedile que te lo aclare, con ejemplos como 'al contado' o 'con crédito hipotecario'."
+              : `Ya sabés que su urgencia es "${lead.urgencia}". Reconocelo brevemente y hacé UNA sola pregunta: cómo piensa financiar la compra (las opciones aparecen como botones debajo).`,
+            "¿Cómo pensás financiar la compra?",
+            {
+              quickReplies: FINANCIAMIENTO_OPCIONES.map((o) => ({
+                label: o,
+                value: o,
+              })),
+            },
+          );
+          return;
+        }
+        if (!lead.presupuesto) {
+          stepRef.current = 5;
+          lastAskedRef.current = "presupuesto";
+          await botSay(
+            stillMissingExpected
+              ? "No pudiste entender el monto del presupuesto. Pedile que lo escriba en dólares con un ejemplo (90.000 o USD 120.000)."
+              : "Hacé UNA sola pregunta: cuál es su presupuesto aproximado para esta compra, pidiéndole que lo escriba en dólares con un ejemplo (90.000 o USD 120.000).",
             "Por último, ¿cuál es tu presupuesto aproximado para esta compra? Escribilo en dólares (por ejemplo: 90.000 o USD 120.000).",
           );
           return;
         }
-        case 5: {
-          // La IA extrae el monto del presupuesto; parseo local de respaldo.
-          let presupuesto: number | null = null;
-          setTyping(true);
-          try {
-            const res = await interpret({
-              data: {
-                kind: "budget",
-                question:
-                  "¿Cuál es tu presupuesto aproximado para esta compra?",
-                message: text,
-              },
-            });
-            presupuesto = res.amount;
-          } catch (err) {
-            console.error("[PropBot] interpret presupuesto:", err);
-          }
-          setTyping(false);
-          if (presupuesto === null) presupuesto = parseBudget(text);
-          if (presupuesto === null) {
-            await botSay(
-              "No pudiste entender el monto del presupuesto. Pedile que lo escriba en dólares con un ejemplo (90.000 o USD 120.000).",
-              "No pude entender ese monto 🤔. Escribí tu presupuesto en dólares, por ejemplo: 90.000 o USD 120.000.",
-            );
-            return;
-          }
-          lead.presupuesto = presupuesto;
-          lead.prioridad = calcPrioridad(lead);
 
-          const { ok, reasons } = qualifyForProperty(activePropRef.current, lead);
+        // Tenemos urgencia, financiamiento y presupuesto: calificamos.
+        lastAskedRef.current = null;
+        lead.prioridad = calcPrioridad(lead);
 
-          // No califica para esta propiedad: NO entregamos el lead.
-          // Lo derivamos a ver opciones que sí encajan.
-          if (!ok) {
-            const { cards } = recommendProps();
-            await botSay(
-              `Agradecele que te contó sus datos. Con tacto y sin mencionar ninguna calificación interna, explicale que esta propiedad puntual no sería la mejor opción para él/ella por estos motivos: ${reasons.join(
-                " y ",
-              )}.`,
-              `Gracias por contarme. Mirando lo que necesitás, ${reasons.join(
-                " y ",
-              )}. Por eso esta propiedad no sería la mejor opción para vos.`,
-              {},
-              500,
-            );
-            if (cards.length > 0) {
-              await new Promise((r) => setTimeout(r, 400));
-              await botSay(
-                "Presentale, con entusiasmo, estas otras opciones que sí encajan con su presupuesto y preferencias (se muestran como tarjetas debajo). Invitalo a tocar el botón 'Me interesa también' si alguna le gusta, para coordinar la visita.",
-                "Con tus preferencias, estas opciones sí encajan mejor. Si alguna te interesa, tocá “Me interesa también” y coordinamos la visita:",
-                { recCards: cards },
-              );
-            } else {
-              await new Promise((r) => setTimeout(r, 400));
-              await botSay(
-                lead.zona
-                  ? `Explicale que por ahora en ${lead.zona} no tenés propiedades que se ajusten a su presupuesto, e invitalo a recorrer el catálogo completo por si encuentra algo que le guste. Debajo de tu mensaje hay un botón para verlo.`
-                  : "Explicale que por ahora no tenés propiedades que se ajusten a su presupuesto y a lo que busca, e invitalo a recorrer el catálogo completo. Debajo de tu mensaje hay un botón para verlo.",
-                lead.zona
-                  ? `Por ahora en ${lead.zona} no tenemos propiedades que se ajusten a tu presupuesto. De todos modos, te invito a recorrer todo nuestro catálogo por si encontrás algo que te guste 👇`
-                  : "Por ahora no tenemos propiedades que se ajusten a tu presupuesto y a lo que estás buscando. De todos modos, te invito a recorrer todo nuestro catálogo por si encontrás algo que te guste 👇",
-                { cta: { label: "Ver propiedades disponibles" } },
-              );
-            }
-            setNotQualified(true);
-            return;
-          }
+        const { ok, reasons } = qualifyForProperty(activePropRef.current, lead);
 
-          // Califica: entregamos el lead y coordinamos la visita.
-          void sendLeadToSheet(leadPayload(lead, activePropRef.current));
-          stepRef.current = 4;
-          await presentAgenda(
-            "El usuario calificó. Agradecele y proponele coordinar una visita presencial para conocer la propiedad. Pedile que elija uno de los horarios disponibles (se muestran como botones debajo).",
-            "¡Gracias! Podemos coordinar una visita para que la conozcas en persona. Elegí uno de los horarios disponibles:",
+        // No califica para esta propiedad: NO entregamos el lead.
+        // Lo derivamos a ver opciones que sí encajan.
+        if (!ok) {
+          const { cards } = recommendProps();
+          await botSay(
+            `Agradecele que te contó sus datos. Con tacto y sin mencionar ninguna calificación interna, explicale que esta propiedad puntual no sería la mejor opción para él/ella por estos motivos: ${reasons.join(
+              " y ",
+            )}.`,
+            `Gracias por contarme. Mirando lo que necesitás, ${reasons.join(
+              " y ",
+            )}. Por eso esta propiedad no sería la mejor opción para vos.`,
+            {},
+            500,
           );
+          if (cards.length > 0) {
+            await new Promise((r) => setTimeout(r, 400));
+            await botSay(
+              "Presentale, con entusiasmo, estas otras opciones que sí encajan con su presupuesto y preferencias (se muestran como tarjetas debajo). Invitalo a tocar el botón 'Me interesa también' si alguna le gusta, para coordinar la visita.",
+              "Con tus preferencias, estas opciones sí encajan mejor. Si alguna te interesa, tocá “Me interesa también” y coordinamos la visita:",
+              { recCards: cards },
+            );
+          } else {
+            await new Promise((r) => setTimeout(r, 400));
+            await botSay(
+              lead.zona
+                ? `Explicale que por ahora en ${lead.zona} no tenés propiedades que se ajusten a su presupuesto, e invitalo a recorrer el catálogo completo por si encuentra algo que le guste. Debajo de tu mensaje hay un botón para verlo.`
+                : "Explicale que por ahora no tenés propiedades que se ajusten a su presupuesto y a lo que busca, e invitalo a recorrer el catálogo completo. Debajo de tu mensaje hay un botón para verlo.",
+              lead.zona
+                ? `Por ahora en ${lead.zona} no tenemos propiedades que se ajusten a tu presupuesto. De todos modos, te invito a recorrer todo nuestro catálogo por si encontrás algo que te guste 👇`
+                : "Por ahora no tenemos propiedades que se ajusten a tu presupuesto y a lo que estás buscando. De todos modos, te invito a recorrer todo nuestro catálogo por si encontrás algo que te guste 👇",
+              { cta: { label: "Ver propiedades disponibles" } },
+            );
+          }
+          setNotQualified(true);
           return;
         }
+
+        // Califica: entregamos el lead y coordinamos la visita.
+        void sendLeadToSheet(leadPayload(lead, activePropRef.current));
+        stepRef.current = 4;
+        await presentAgenda(
+          "El usuario calificó. Agradecele y proponele coordinar una visita presencial para conocer la propiedad. Pedile que elija uno de los horarios disponibles (se muestran como botones debajo).",
+          "¡Gracias! Podemos coordinar una visita para que la conozcas en persona. Elegí uno de los horarios disponibles:",
+        );
+        return;
       }
     },
-    [addMsg, botReply, botSay, done, interpret, presentAgenda, property, recommendProps, typing],
+    [addMsg, botReply, botSay, done, extract, presentAgenda, property, recommendProps, typing],
   );
 
   const confirmSlot = useCallback(async () => {

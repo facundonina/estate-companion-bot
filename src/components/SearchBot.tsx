@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { interpretAnswer, generateBotMessage } from "@/lib/botAi.functions";
+import { extractFields, generateBotMessage } from "@/lib/botAi.functions";
 import { Building2, Send, ArrowRight, Bath, BedDouble, Maximize } from "lucide-react";
 import { properties, type Property } from "@/data/properties";
 import { formatPrice } from "@/lib/format";
@@ -94,8 +94,11 @@ export function SearchBot() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const startedRef = useRef(false);
   const awaitingHumanRef = useRef(false);
+  // Último campo que el bot le pidió al usuario (para detectar respuestas
+  // que no aportan el dato esperado y pedir una aclaración).
+  const lastAskedRef = useRef<keyof SearchState | null>(null);
 
-  const interpret = useServerFn(interpretAnswer);
+  const extract = useServerFn(extractFields);
   const genMsg = useServerFn(generateBotMessage);
 
   // Espejo del historial para enviarlo como contexto a la IA.
@@ -213,6 +216,7 @@ export function SearchBot() {
         500,
       );
       stepRef.current = 1;
+      lastAskedRef.current = "tipo";
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -263,178 +267,145 @@ export function SearchBot() {
 
       const s = stateRef.current;
 
-      switch (stepRef.current) {
-        case 1: {
-          // La IA analiza la respuesta libre; coincidencia exacta de respaldo.
-          let tipo: string | null = null;
-          setTyping(true);
-          try {
-            const res = await interpret({
-              data: {
-                kind: "option",
-                question: "¿Qué tipo de propiedad te interesa?",
-                message: text,
-                options: TIPOS,
-              },
-            });
-            tipo = res.option;
-          } catch (err) {
-            console.error("[SearchBot] interpret tipo:", err);
-          }
-          setTyping(false);
-          if (!tipo)
-            tipo =
-              TIPOS.find((t) => t.toLowerCase() === text.toLowerCase()) ?? null;
-          if (!tipo) {
-            await botSay(
-              "No reconociste el tipo de propiedad que dijo el usuario. Pedile con amabilidad que elija uno de los tipos de la lista (botones debajo) para continuar.",
-              "No reconocí esa opción 🤔. Elegí uno de los tipos de propiedad de la lista para continuar.",
-            );
-            return;
-          }
-          s.tipo = tipo;
-          stepRef.current = 2;
-          await botSay(
-            `El usuario busca: ${tipo}. Reconocelo con entusiasmo y hacé UNA sola pregunta: en qué departamento le gustaría (las opciones aparecen como botones debajo).`,
-            "¡Buenísimo! ¿En qué departamento te gustaría?",
-            { quickReplies: DEPARTAMENTOS.map((d) => ({ label: d, value: d })) },
-          );
-          return;
-        }
-        case 2: {
-          // La IA analiza el departamento; coincidencia exacta de respaldo.
-          let dep: string | null = null;
-          setTyping(true);
-          try {
-            const res = await interpret({
-              data: {
-                kind: "option",
-                question: "¿En qué departamento te gustaría?",
-                message: text,
-                options: DEPARTAMENTOS,
-              },
-            });
-            dep = res.option;
-          } catch (err) {
-            console.error("[SearchBot] interpret departamento:", err);
-          }
-          setTyping(false);
-          if (!dep)
-            dep =
-              DEPARTAMENTOS.find((d) => d.toLowerCase() === text.toLowerCase()) ??
-              null;
-          if (!dep) {
-            await botSay(
-              "No reconociste el departamento que mencionó el usuario. Pedile que elija uno de la lista (botones debajo) para continuar.",
-              "No reconocí ese departamento 🤔. Elegí uno de la lista para continuar.",
-            );
-            return;
-          }
-          s.departamento = dep;
-          if (isLandTipo(s.tipo)) {
-            stepRef.current = 4;
-            await botSay(
-              `El usuario eligió el departamento de ${dep}. Como busca un terreno/campo, salteá los dormitorios y preguntale directamente cuál es su presupuesto aproximado, pidiéndolo en dólares con un ejemplo (90.000 o USD 120.000).`,
-              "Perfecto. ¿Cuál es tu presupuesto aproximado? Escribilo en dólares (por ejemplo: 90.000 o USD 120.000).",
-            );
-          } else {
-            stepRef.current = 3;
-            await botSay(
-              `El usuario eligió el departamento de ${dep}. Hacé UNA sola pregunta: cuántos dormitorios necesita (las opciones aparecen como botones debajo).`,
-              "Perfecto. ¿Cuántos dormitorios necesitás?",
-              {
-                quickReplies: [
-                  { label: "1 dormitorio", value: "1" },
-                  { label: "2 dormitorios", value: "2" },
-                  { label: "3 dormitorios", value: "3" },
-                  { label: "4 o más", value: "4" },
-                ],
-              },
-            );
-          }
-          return;
-        }
-        case 3: {
-          // La IA interpreta cuántos dormitorios; parseo numérico de respaldo.
-          let dormitorios: number | null = null;
-          setTyping(true);
-          try {
-            const res = await interpret({
-              data: {
-                kind: "budget",
-                question:
-                  "¿Cuántos dormitorios necesitás? Devolvé solo la cantidad como número.",
-                message: text,
-              },
-            });
-            if (res.amount && res.amount > 0 && res.amount <= 20) {
-              dormitorios = Math.round(res.amount);
-            }
-          } catch (err) {
-            console.error("[SearchBot] interpret dormitorios:", err);
-          }
-          setTyping(false);
-          if (dormitorios === null) {
-            const n = parseInt(text, 10);
-            if (Number.isFinite(n) && n > 0) dormitorios = n;
-          }
-          if (dormitorios === null) {
-            await botSay(
-              "No entendiste cuántos dormitorios necesita el usuario. Pedile que te diga un número (por ejemplo: 1, 2 o 3).",
-              "No pude entender ese número 🤔. Decime cuántos dormitorios necesitás (por ejemplo: 1, 2 o 3).",
-            );
-            return;
-          }
-          s.dormitorios = dormitorios;
-          stepRef.current = 4;
-          await botSay(
-            `El usuario necesita ${dormitorios} dormitorio(s). Por último, preguntale cuál es su presupuesto aproximado, pidiéndolo en dólares con un ejemplo (90.000 o USD 120.000).`,
-            "¿Cuál es tu presupuesto aproximado? Escribilo en dólares (por ejemplo: 90.000 o USD 120.000).",
-          );
-          return;
-        }
-        case 4: {
-          // La IA extrae el monto del presupuesto; parseo local de respaldo.
-          let presupuesto: number | null = null;
-          setTyping(true);
-          try {
-            const res = await interpret({
-              data: {
-                kind: "budget",
-                question: "¿Cuál es tu presupuesto aproximado?",
-                message: text,
-              },
-            });
-            presupuesto = res.amount;
-          } catch (err) {
-            console.error("[SearchBot] interpret presupuesto:", err);
-          }
-          setTyping(false);
-          if (presupuesto === null) presupuesto = parseBudget(text);
-          if (presupuesto === null) {
-            await botSay(
-              "No pudiste entender el monto del presupuesto. Pedile que lo escriba en dólares con un ejemplo (90.000 o USD 120.000).",
-              "No pude entender ese monto 🤔. Escribí tu presupuesto en dólares, por ejemplo: 90.000 o USD 120.000.",
-            );
-            return;
-          }
-          s.presupuesto = presupuesto;
-          stepRef.current = 5;
-          await showResults();
-          return;
-        }
-        default: {
-          await botReply(
-            {
-              text: "Si querés empezar otra búsqueda, recargá la página. Mientras tanto, podés ver todo el catálogo acá 👇",
-              cta: true,
-            },
-            600,
-          );
-        }
+      // Búsqueda ya completada.
+      if (stepRef.current >= 5) {
+        await botReply(
+          {
+            text: "Si querés empezar otra búsqueda, recargá la página. Mientras tanto, podés ver todo el catálogo acá 👇",
+            cta: true,
+          },
+          600,
+        );
+        return;
       }
+
+      // La IA interpreta TODO el mensaje del usuario y extrae, de una sola vez,
+      // todos los datos que todavía falten (un mensaje libre puede completar
+      // varios pasos: "quiero una casa de 3 dormitorios en Pocitos").
+      const fields: Array<{
+        name: string;
+        kind: "option" | "number" | "budget";
+        description: string;
+        options?: string[];
+      }> = [];
+      if (!s.tipo)
+        fields.push({
+          name: "tipo",
+          kind: "option",
+          description: "Qué tipo de propiedad busca el usuario.",
+          options: TIPOS,
+        });
+      if (!s.departamento)
+        fields.push({
+          name: "departamento",
+          kind: "option",
+          description: "En qué departamento de Uruguay quiere la propiedad.",
+          options: DEPARTAMENTOS,
+        });
+      if (!s.dormitorios)
+        fields.push({
+          name: "dormitorios",
+          kind: "number",
+          description: "Cuántos dormitorios necesita.",
+        });
+      if (!s.presupuesto)
+        fields.push({
+          name: "presupuesto",
+          kind: "budget",
+          description: "Presupuesto aproximado en dólares para la compra.",
+        });
+
+      setTyping(true);
+      try {
+        const history = messagesRef.current
+          .filter((m) => m.text)
+          .slice(-12)
+          .map((m) => ({ role: m.role, text: m.text as string }));
+        const res = await extract({ data: { history, message: text, fields } });
+        const v = res?.values ?? {};
+        if (typeof v.tipo === "string") s.tipo = v.tipo;
+        if (typeof v.departamento === "string") s.departamento = v.departamento;
+        if (typeof v.dormitorios === "number" && v.dormitorios > 0)
+          s.dormitorios = v.dormitorios;
+        if (typeof v.presupuesto === "number" && v.presupuesto > 0)
+          s.presupuesto = v.presupuesto;
+      } catch (err) {
+        console.error("[SearchBot] extract:", err);
+      }
+      setTyping(false);
+
+      // Respaldo local de presupuesto si la IA no lo detectó.
+      if (!s.presupuesto && lastAskedRef.current === "presupuesto") {
+        const b = parseBudget(text);
+        if (b) s.presupuesto = b;
+      }
+
+      // ¿El usuario no aportó el dato que se le pidió recién? Pedimos aclaración.
+      const expected = lastAskedRef.current;
+      const stillMissingExpected =
+        (expected === "tipo" && !s.tipo) ||
+        (expected === "departamento" && !s.departamento) ||
+        (expected === "dormitorios" && !s.dormitorios) ||
+        (expected === "presupuesto" && !s.presupuesto);
+
+      // Próxima pregunta según el primer dato que falte.
+      if (!s.tipo) {
+        lastAskedRef.current = "tipo";
+        await botSay(
+          stillMissingExpected
+            ? "No reconociste el tipo de propiedad que dijo el usuario. Pedile con amabilidad que elija uno de los tipos de la lista (botones debajo)."
+            : "Hacé UNA sola pregunta: qué tipo de propiedad le interesa (las opciones aparecen como botones debajo).",
+          "¿Qué tipo de propiedad te interesa? Elegí una opción 👇",
+          { quickReplies: TIPOS.map((t) => ({ label: t, value: t })) },
+        );
+        return;
+      }
+      if (!s.departamento) {
+        lastAskedRef.current = "departamento";
+        await botSay(
+          stillMissingExpected
+            ? "No reconociste el departamento que mencionó el usuario. Pedile que elija uno de la lista (botones debajo)."
+            : `El usuario busca: ${s.tipo}. Reconocelo con entusiasmo y hacé UNA sola pregunta: en qué departamento le gustaría (las opciones aparecen como botones debajo).`,
+          "¡Buenísimo! ¿En qué departamento te gustaría?",
+          { quickReplies: DEPARTAMENTOS.map((d) => ({ label: d, value: d })) },
+        );
+        return;
+      }
+      if (!isLandTipo(s.tipo) && !s.dormitorios) {
+        lastAskedRef.current = "dormitorios";
+        await botSay(
+          stillMissingExpected
+            ? "No entendiste cuántos dormitorios necesita el usuario. Pedile que te diga un número (por ejemplo: 1, 2 o 3)."
+            : "Hacé UNA sola pregunta: cuántos dormitorios necesita (las opciones aparecen como botones debajo).",
+          "¿Cuántos dormitorios necesitás?",
+          {
+            quickReplies: [
+              { label: "1 dormitorio", value: "1" },
+              { label: "2 dormitorios", value: "2" },
+              { label: "3 dormitorios", value: "3" },
+              { label: "4 o más", value: "4" },
+            ],
+          },
+        );
+        return;
+      }
+      if (!s.presupuesto) {
+        lastAskedRef.current = "presupuesto";
+        await botSay(
+          stillMissingExpected
+            ? "No pudiste entender el monto del presupuesto. Pedile que lo escriba en dólares con un ejemplo (90.000 o USD 120.000)."
+            : "Hacé UNA sola pregunta: cuál es su presupuesto aproximado, pidiéndolo en dólares con un ejemplo (90.000 o USD 120.000).",
+          "¿Cuál es tu presupuesto aproximado? Escribilo en dólares (por ejemplo: 90.000 o USD 120.000).",
+        );
+        return;
+      }
+
+      // Tenemos todos los datos: mostramos los resultados.
+      lastAskedRef.current = null;
+      stepRef.current = 5;
+      await showResults();
     },
-    [addMsg, botReply, botSay, interpret, showResults, typing],
+    [addMsg, botReply, botSay, extract, showResults, typing],
   );
 
   return (
