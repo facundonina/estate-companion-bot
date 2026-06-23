@@ -358,7 +358,20 @@ function PropertyCardBubble({ p }: { p: Property }) {
   );
 }
 
-export function PropBot({ property, lead }: { property: Property; lead: BotLead }) {
+export function PropBot({
+  property,
+  lead,
+  secondary = false,
+}: {
+  property: Property;
+  lead: BotLead & {
+    urgencia?: string;
+    financiamiento?: string;
+    presupuesto?: number;
+    prioridad?: string;
+  };
+  secondary?: boolean;
+}) {
   const [messages, setMessages] = useState<BotMessage[]>([]);
   const [typing, setTyping] = useState(false);
   const [input, setInput] = useState("");
