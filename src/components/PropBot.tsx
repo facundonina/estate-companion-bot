@@ -9,6 +9,7 @@ import { propertyImage } from "@/lib/propertyImage";
 import { sendLeadToSheet } from "@/lib/leadSheet";
 import { parseBudget } from "@/lib/parseBudget";
 import { isAngryMessage, isAffirmative } from "@/lib/sentiment";
+import { setStoredLead, mergeStoredLead } from "@/lib/leadStore";
 import {
   getAvailableSlots,
   createCalendarEvent,
