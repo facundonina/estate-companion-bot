@@ -396,6 +396,9 @@ export function PropBot({
   const scrollRef = useRef<HTMLDivElement>(null);
   const startedRef = useRef(false);
   const awaitingHumanRef = useRef(false);
+  // En modo "secundario" esperamos que confirme si quiere avanzar también
+  // por esta propiedad antes de seguir con el flujo.
+  const secondaryConfirmRef = useRef(false);
   // Último campo que el bot le pidió al usuario (para detectar respuestas
   // que no aportan el dato esperado y pedir una aclaración).
   const lastAskedRef = useRef<"urgencia" | "financiamiento" | "presupuesto" | null>(
