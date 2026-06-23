@@ -9,6 +9,7 @@ import { propertyImage } from "@/lib/propertyImage";
 import { sendLeadToSheet } from "@/lib/leadSheet";
 import { parseBudget } from "@/lib/parseBudget";
 import { isAngryMessage, isAffirmative } from "@/lib/sentiment";
+import { mergeStoredLead } from "@/lib/leadStore";
 import {
   getAvailableSlots,
   createCalendarEvent,
@@ -358,7 +359,20 @@ function PropertyCardBubble({ p }: { p: Property }) {
   );
 }
 
-export function PropBot({ property, lead }: { property: Property; lead: BotLead }) {
+export function PropBot({
+  property,
+  lead,
+  secondary = false,
+}: {
+  property: Property;
+  lead: BotLead & {
+    urgencia?: string;
+    financiamiento?: string;
+    presupuesto?: number;
+    prioridad?: string;
+  };
+  secondary?: boolean;
+}) {
   const [messages, setMessages] = useState<BotMessage[]>([]);
   const [typing, setTyping] = useState(false);
   const [input, setInput] = useState("");
@@ -382,6 +396,9 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
   const scrollRef = useRef<HTMLDivElement>(null);
   const startedRef = useRef(false);
   const awaitingHumanRef = useRef(false);
+  // En modo "secundario" esperamos que confirme si quiere avanzar también
+  // por esta propiedad antes de seguir con el flujo.
+  const secondaryConfirmRef = useRef(false);
   // Último campo que el bot le pidió al usuario (para detectar respuestas
   // que no aportan el dato esperado y pedir una aclaración).
   const lastAskedRef = useRef<"urgencia" | "financiamiento" | "presupuesto" | null>(
@@ -521,20 +538,105 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
     return { cards: sortTop(filtered).slice(0, 3), expanded: false };
   }, []);
 
+  // Con urgencia, financiamiento y presupuesto ya conocidos, evalúa si el lead
+  // califica para la propiedad activa: si sí, entrega el lead y abre la agenda;
+  // si no, deriva a otras opciones. Persiste la calificación para reutilizarla
+  // en próximos chats de esta sesión.
+  const finalizeQualification = useCallback(async () => {
+    const lead = leadRef.current;
+    lastAskedRef.current = null;
+    lead.prioridad = calcPrioridad(lead);
+    mergeStoredLead({
+      urgencia: lead.urgencia,
+      financiamiento: lead.financiamiento,
+      presupuesto: lead.presupuesto,
+      prioridad: lead.prioridad,
+    });
+
+    const { ok, reasons } = qualifyForProperty(activePropRef.current, lead);
+
+    // No califica para esta propiedad: NO entregamos el lead.
+    // Lo derivamos a ver opciones que sí encajan.
+    if (!ok) {
+      const { cards } = recommendProps();
+      await botSay(
+        `Agradecele que te contó sus datos. Con tacto y sin mencionar ninguna calificación interna, explicale que esta propiedad puntual no sería la mejor opción para él/ella por estos motivos: ${reasons.join(
+          " y ",
+        )}.`,
+        `Gracias por contarme. Mirando lo que necesitás, ${reasons.join(
+          " y ",
+        )}. Por eso esta propiedad no sería la mejor opción para vos.`,
+        {},
+        500,
+      );
+      if (cards.length > 0) {
+        await new Promise((r) => setTimeout(r, 400));
+        await botSay(
+          "Presentale, con entusiasmo, estas otras opciones que sí encajan con su presupuesto y preferencias (se muestran como tarjetas debajo). Invitalo a tocar el botón 'Ver' para conocer la que le guste.",
+          "Con tus preferencias, estas opciones sí encajan mejor. Tocá “Ver” en la que te interese para conocerla:",
+          { recCards: cards },
+        );
+      } else {
+        await new Promise((r) => setTimeout(r, 400));
+        await botSay(
+          lead.zona
+            ? `Explicale que por ahora en ${lead.zona} no tenés propiedades que se ajusten a su presupuesto, e invitalo a recorrer el catálogo completo por si encuentra algo que le guste. Debajo de tu mensaje hay un botón para verlo.`
+            : "Explicale que por ahora no tenés propiedades que se ajusten a su presupuesto y a lo que busca, e invitalo a recorrer el catálogo completo. Debajo de tu mensaje hay un botón para verlo.",
+          lead.zona
+            ? `Por ahora en ${lead.zona} no tenemos propiedades que se ajusten a tu presupuesto. De todos modos, te invito a recorrer todo nuestro catálogo por si encontrás algo que te guste 👇`
+            : "Por ahora no tenemos propiedades que se ajusten a tu presupuesto y a lo que estás buscando. De todos modos, te invito a recorrer todo nuestro catálogo por si encontrás algo que te guste 👇",
+          { cta: { label: "Ver propiedades disponibles" } },
+        );
+      }
+      setNotQualified(true);
+      return;
+    }
+
+    // Califica: entregamos el lead y coordinamos la visita.
+    void sendLeadToSheet(leadPayload(lead, activePropRef.current));
+    stepRef.current = 4;
+    await presentAgenda(
+      "El usuario calificó. Agradecele y proponele coordinar una visita presencial para conocer la propiedad. Pedile que elija uno de los horarios disponibles (se muestran como botones debajo).",
+      "¡Gracias! Podemos coordinar una visita para que la conozcas en persona. Elegí uno de los horarios disponibles:",
+    );
+  }, [botSay, presentAgenda, recommendProps]);
+
+
   // Kick off the conversation once.
   useEffect(() => {
     if (startedRef.current) return;
     startedRef.current = true;
     (async () => {
       const propDesc = `${property.tipo} en ${property.barrio}, ${property.departamento} (${formatPrice(property.precio, property.moneda)})`;
+      leadRef.current.zona = property.zona;
+      leadRef.current.tipo = property.tipo;
+
+      // Modo secundario: el usuario ya dejó sus datos y eligió ver otra
+      // propiedad recomendada. No le pedimos el formulario de nuevo: abrimos
+      // un chat con sus datos y le preguntamos si quiere avanzar por esta.
+      if (secondary) {
+        await botSay(
+          `Saludá a ${firstName(lead.nombre)} por su nombre, de forma cálida y como si ya se conocieran. Decile que viste que también se interesó en esta propiedad: ${propDesc}. Preguntale con entusiasmo si le gustaría avanzar por esta propiedad también. La tarjeta se muestra debajo de tu mensaje; no le pidas sus datos porque ya los tenés.`,
+          `¡Hola de nuevo, ${firstName(lead.nombre)}! Vimos que también te interesó esta propiedad. ¿Te gustaría avanzar por esta propiedad también?`,
+          {
+            card: property,
+            quickReplies: [
+              { label: "Sí, me interesa", value: "Sí" },
+              { label: "No, gracias", value: "No" },
+            ],
+          },
+          650,
+        );
+        secondaryConfirmRef.current = true;
+        return;
+      }
+
       await botSay(
         `Saludá a ${firstName(lead.nombre)} por su nombre y, con entusiasmo, contale que viste que se interesó en esta propiedad: ${propDesc}. Presentate brevemente como PropBot. No hagas preguntas todavía: la tarjeta de la propiedad se muestra debajo de tu mensaje.`,
         `¡Hola ${firstName(lead.nombre)}! Vi que te interesaste en esta propiedad:`,
         { card: property },
         650,
       );
-      leadRef.current.zona = property.zona;
-      leadRef.current.tipo = property.tipo;
       await new Promise((r) => setTimeout(r, 300));
       await botSay(
         "Decile que, antes de coordinar la visita, te gustaría conocer un par de cosas para asegurarte de que sea la mejor opción para él/ella. Después hacé UNA sola pregunta: con qué urgencia o para cuándo necesita concretar la compra.",
@@ -560,6 +662,44 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
       if (!text || typing) return;
       addMsg({ role: "user", text });
       setInput("");
+
+      // Modo secundario: esperábamos que confirme si quiere avanzar también
+      // por esta propiedad. Ya tenemos sus datos, así que no pedimos formulario.
+      if (secondaryConfirmRef.current) {
+        secondaryConfirmRef.current = false;
+        if (!isAffirmative(text)) {
+          await botReply(
+            {
+              text: "¡Sin problema! Cualquier cosa que necesites, estoy por acá. 😊",
+            },
+            600,
+          );
+          setDone(true);
+          return;
+        }
+        const lead = leadRef.current;
+        // Si en un chat anterior ya nos dio su calificación, vamos directo a
+        // evaluar y coordinar la visita. Si no, arrancamos las preguntas.
+        if (lead.urgencia && lead.financiamiento && lead.presupuesto) {
+          await finalizeQualification();
+          return;
+        }
+        stepRef.current = 2;
+        lastAskedRef.current = "urgencia";
+        await botSay(
+          "El usuario quiere avanzar por esta propiedad. Decile que para asegurarte de que sea la mejor opción para él/ella querés conocer un par de cosas, y hacé UNA sola pregunta: con qué urgencia o para cuándo necesita concretar la compra (las opciones aparecen como botones debajo).",
+          "¡Buenísimo! Para asegurarme de que sea la mejor opción para vos, ¿cuándo necesitás concretar la compra?",
+          {
+            quickReplies: URGENCIA_OPCIONES.map((o) => ({
+              label: o,
+              value: o,
+            })),
+          },
+        );
+        return;
+      }
+
+
 
       // ¿Estábamos esperando que confirme si quiere hablar con un humano?
       if (awaitingHumanRef.current) {
@@ -736,59 +876,20 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
         }
 
         // Tenemos urgencia, financiamiento y presupuesto: calificamos.
-        lastAskedRef.current = null;
-        lead.prioridad = calcPrioridad(lead);
-
-        const { ok, reasons } = qualifyForProperty(activePropRef.current, lead);
-
-        // No califica para esta propiedad: NO entregamos el lead.
-        // Lo derivamos a ver opciones que sí encajan.
-        if (!ok) {
-          const { cards } = recommendProps();
-          await botSay(
-            `Agradecele que te contó sus datos. Con tacto y sin mencionar ninguna calificación interna, explicale que esta propiedad puntual no sería la mejor opción para él/ella por estos motivos: ${reasons.join(
-              " y ",
-            )}.`,
-            `Gracias por contarme. Mirando lo que necesitás, ${reasons.join(
-              " y ",
-            )}. Por eso esta propiedad no sería la mejor opción para vos.`,
-            {},
-            500,
-          );
-          if (cards.length > 0) {
-            await new Promise((r) => setTimeout(r, 400));
-            await botSay(
-              "Presentale, con entusiasmo, estas otras opciones que sí encajan con su presupuesto y preferencias (se muestran como tarjetas debajo). Invitalo a tocar el botón 'Me interesa también' si alguna le gusta, para coordinar la visita.",
-              "Con tus preferencias, estas opciones sí encajan mejor. Si alguna te interesa, tocá “Me interesa también” y coordinamos la visita:",
-              { recCards: cards },
-            );
-          } else {
-            await new Promise((r) => setTimeout(r, 400));
-            await botSay(
-              lead.zona
-                ? `Explicale que por ahora en ${lead.zona} no tenés propiedades que se ajusten a su presupuesto, e invitalo a recorrer el catálogo completo por si encuentra algo que le guste. Debajo de tu mensaje hay un botón para verlo.`
-                : "Explicale que por ahora no tenés propiedades que se ajusten a su presupuesto y a lo que busca, e invitalo a recorrer el catálogo completo. Debajo de tu mensaje hay un botón para verlo.",
-              lead.zona
-                ? `Por ahora en ${lead.zona} no tenemos propiedades que se ajusten a tu presupuesto. De todos modos, te invito a recorrer todo nuestro catálogo por si encontrás algo que te guste 👇`
-                : "Por ahora no tenemos propiedades que se ajusten a tu presupuesto y a lo que estás buscando. De todos modos, te invito a recorrer todo nuestro catálogo por si encontrás algo que te guste 👇",
-              { cta: { label: "Ver propiedades disponibles" } },
-            );
-          }
-          setNotQualified(true);
-          return;
-        }
-
-        // Califica: entregamos el lead y coordinamos la visita.
-        void sendLeadToSheet(leadPayload(lead, activePropRef.current));
-        stepRef.current = 4;
-        await presentAgenda(
-          "El usuario calificó. Agradecele y proponele coordinar una visita presencial para conocer la propiedad. Pedile que elija uno de los horarios disponibles (se muestran como botones debajo).",
-          "¡Gracias! Podemos coordinar una visita para que la conozcas en persona. Elegí uno de los horarios disponibles:",
-        );
+        await finalizeQualification();
         return;
       }
     },
-    [addMsg, botReply, botSay, done, extract, presentAgenda, property, recommendProps, typing],
+    [
+      addMsg,
+      botReply,
+      botSay,
+      done,
+      extract,
+      finalizeQualification,
+      presentAgenda,
+      typing,
+    ],
   );
 
   const confirmSlot = useCallback(async () => {
@@ -834,8 +935,8 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
         if (cards.length > 0) {
           await new Promise((r) => setTimeout(r, 600));
           await botSay(
-            "Comentale que además tenés estas otras propiedades que también podrían interesarle (se muestran como tarjetas debajo). Invitalo a tocar 'Me interesa también' si alguna le gusta para coordinar la visita.",
-            "Además, tengo estas otras propiedades que también podrían interesarte. Si alguna te gusta, tocá “Me interesa también” y coordinamos la visita 👇",
+            "Comentale que además tenés estas otras propiedades que también podrían interesarle (se muestran como tarjetas debajo). Invitalo a tocar 'Ver' en la que le guste para conocerla.",
+            "Además, tengo estas otras propiedades que también podrían interesarte. Tocá “Ver” en la que te guste para conocerla 👇",
             { recCards: cards },
           );
         }
@@ -852,46 +953,6 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
     }
   }, [addMsg, botReply, botSay, confirming, recommendProps, selectedSlot, slotConfirmed]);
 
-  // El usuario eligió "Me interesa también" sobre una recomendación.
-  // Reutilizamos sus datos ya recolectados (no volvemos a preguntar).
-  const expressInterest = useCallback(
-    async (p: Property) => {
-      if (typing || confirming) return;
-      addMsg({
-        role: "user",
-        text: `Me interesa también: ${p.tipo} en ${p.barrio}`,
-      });
-      activePropRef.current = p;
-      void sendLeadToSheet(leadPayload(leadRef.current, p));
-
-      // Si ya hay un horario confirmado, sumamos esta propiedad a la MISMA
-      // reunión: es un único encuentro con el asesor, así que no pedimos
-      // otro horario.
-      const slot = confirmedSlotRef.current;
-      if (slot) {
-        await botSay(
-          `El usuario sumó ${p.tipo} en ${p.barrio} a su interés. Confirmale con entusiasmo que la van a sumar a la MISMA reunión del ${slot.label} a las ${slot.time}, donde el asesor le va a mostrar todas las opciones. Despedite.`,
-          `¡Genial! Sumamos ${p.tipo} en ${p.barrio} a la misma reunión del ${slot.label} a las ${slot.time}. El asesor te va a mostrar todas las opciones en ese mismo encuentro. ¡Nos vemos!`,
-          {},
-          500,
-        );
-        return;
-      }
-
-      // Si todavía no hay horario confirmado, abrimos la agenda.
-      setSelectedSlot(null);
-      setSlotConfirmed(false);
-      setConfirming(false);
-      setDone(false);
-      setNotQualified(false);
-      stepRef.current = 4;
-      await presentAgenda(
-        `El usuario se interesó en ${p.tipo} en ${p.barrio}. Proponele coordinar una visita para conocerla y pedile que elija uno de los horarios disponibles (se muestran como botones debajo).`,
-        `¡Genial! Coordinemos una visita para ${p.tipo} en ${p.barrio}. Elegí uno de los horarios disponibles:`,
-      );
-    },
-    [addMsg, botSay, confirming, presentAgenda, typing],
-  );
 
 
 
@@ -948,24 +1009,15 @@ export function PropBot({ property, lead }: { property: Property; lead: BotLead 
                   {m.recCards.map((c) => (
                     <div key={c.id} className="flex flex-col gap-1.5">
                       <PropertyCardBubble p={c} />
-                      <div className="flex gap-1.5">
-                        <Link
-                          to="/propiedades/$id"
-                          params={{ id: String(c.id) }}
-                          className="flex-1 rounded-full border border-border bg-card px-3 py-1.5 text-center text-[12px] font-medium text-foreground transition-colors hover:bg-secondary"
-                        >
-                          Ver
-                        </Link>
-                        <button
-                          type="button"
-                          disabled={typing || confirming}
-                          onClick={() => expressInterest(c)}
-                          className="flex-1 rounded-full bg-primary px-3 py-1.5 text-center text-[12px] font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
-                        >
-                          Me interesa también
-                        </button>
-                      </div>
+                      <Link
+                        to="/propiedades/$id"
+                        params={{ id: String(c.id) }}
+                        className="block w-full rounded-full bg-primary px-3 py-1.5 text-center text-[12px] font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+                      >
+                        Ver
+                      </Link>
                     </div>
+
                   ))}
                 </div>
               )}

@@ -1,4 +1,5 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import {
   BedDouble,
   Bath,
@@ -10,13 +11,15 @@ import {
   Check,
   Phone,
 } from "lucide-react";
-import { properties } from "@/data/properties";
+import { properties, type Property } from "@/data/properties";
 import { formatPrice, propertyTitle } from "@/lib/format";
 import { propertyImage } from "@/lib/propertyImage";
 import { buildLongDescription } from "@/lib/description";
 import { PropertyMedia } from "@/components/PropertyMedia";
 import { PropertyCard } from "@/components/PropertyCard";
 import { LeadForm } from "@/components/LeadForm";
+import { PropBot } from "@/components/PropBot";
+import { getStoredLead, type StoredLead } from "@/lib/leadStore";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 
@@ -215,7 +218,7 @@ function PropertyDetail() {
             </p>
           </div>
 
-          <LeadForm property={p} />
+          <LeadSection property={p} />
         </aside>
       </div>
 
@@ -239,6 +242,34 @@ function PropertyDetail() {
     </div>
   );
 }
+
+// Decide qué mostrar en el panel lateral:
+// - Si el usuario todavía no dejó sus datos: el formulario de contacto.
+// - Si ya los dejó en esta sesión (eligió "Ver" otra propiedad recomendada):
+//   abrimos un chat nuevo con sus datos ya cargados, en modo "secundario".
+// Se lee el lead después del montaje para evitar desajustes de hidratación.
+function LeadSection({ property }: { property: Property }) {
+  const [storedLead, setStoredLead] = useState<StoredLead | null>(null);
+
+  useEffect(() => {
+    setStoredLead(getStoredLead());
+  }, [property.id]);
+
+  if (storedLead) {
+    return (
+      <PropBot
+        key={property.id}
+        property={property}
+        lead={storedLead}
+        secondary
+      />
+    );
+  }
+
+  return <LeadForm key={property.id} property={property} />;
+}
+
+
 
 function Spec({
   icon: Icon,
