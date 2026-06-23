@@ -953,46 +953,6 @@ export function PropBot({
     }
   }, [addMsg, botReply, botSay, confirming, recommendProps, selectedSlot, slotConfirmed]);
 
-  // El usuario eligió "Me interesa también" sobre una recomendación.
-  // Reutilizamos sus datos ya recolectados (no volvemos a preguntar).
-  const expressInterest = useCallback(
-    async (p: Property) => {
-      if (typing || confirming) return;
-      addMsg({
-        role: "user",
-        text: `Me interesa también: ${p.tipo} en ${p.barrio}`,
-      });
-      activePropRef.current = p;
-      void sendLeadToSheet(leadPayload(leadRef.current, p));
-
-      // Si ya hay un horario confirmado, sumamos esta propiedad a la MISMA
-      // reunión: es un único encuentro con el asesor, así que no pedimos
-      // otro horario.
-      const slot = confirmedSlotRef.current;
-      if (slot) {
-        await botSay(
-          `El usuario sumó ${p.tipo} en ${p.barrio} a su interés. Confirmale con entusiasmo que la van a sumar a la MISMA reunión del ${slot.label} a las ${slot.time}, donde el asesor le va a mostrar todas las opciones. Despedite.`,
-          `¡Genial! Sumamos ${p.tipo} en ${p.barrio} a la misma reunión del ${slot.label} a las ${slot.time}. El asesor te va a mostrar todas las opciones en ese mismo encuentro. ¡Nos vemos!`,
-          {},
-          500,
-        );
-        return;
-      }
-
-      // Si todavía no hay horario confirmado, abrimos la agenda.
-      setSelectedSlot(null);
-      setSlotConfirmed(false);
-      setConfirming(false);
-      setDone(false);
-      setNotQualified(false);
-      stepRef.current = 4;
-      await presentAgenda(
-        `El usuario se interesó en ${p.tipo} en ${p.barrio}. Proponele coordinar una visita para conocerla y pedile que elija uno de los horarios disponibles (se muestran como botones debajo).`,
-        `¡Genial! Coordinemos una visita para ${p.tipo} en ${p.barrio}. Elegí uno de los horarios disponibles:`,
-      );
-    },
-    [addMsg, botSay, confirming, presentAgenda, typing],
-  );
 
 
 
