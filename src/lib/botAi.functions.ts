@@ -278,15 +278,15 @@ export const extractFields = createServerFn({ method: "POST" })
           "X-Lovable-AIG-SDK": "vercel-ai-sdk",
         },
       });
-      const model = provider(GEMINI_MODEL);
+      // Usamos el mismo modelo que ya funciona para salida estructurada.
+      const model = provider("google/gemini-3-flash-preview");
 
-      // Esquema dinámico: una propiedad nullable por cada campo pedido.
+      // Esquema dinámico. Evitamos tipos nullable (Gemini falla la salida
+      // estructurada con uniones null): usamos valores centinela —
+      // "NONE" para opciones y 0 para números— que luego mapeamos a null.
       const shape: Record<string, z.ZodTypeAny> = {};
       for (const f of data.fields) {
-        shape[f.name] =
-          f.kind === "option"
-            ? z.string().nullable()
-            : z.number().nullable();
+        shape[f.name] = f.kind === "option" ? z.string() : z.number();
       }
       const schema = z.object(shape);
 
@@ -295,12 +295,12 @@ export const extractFields = createServerFn({ method: "POST" })
         .map((f) => {
           if (f.kind === "option") {
             const opts = (f.options ?? []).map((o) => `"${o}"`).join(", ");
-            return `- ${f.name}: ${f.description} Devolvé EXACTAMENTE una de estas opciones: ${opts}. Si no se puede determinar, devolvé null.`;
+            return `- ${f.name}: ${f.description} Devolvé EXACTAMENTE una de estas opciones: ${opts}. Si no se puede determinar a partir del mensaje, devolvé exactamente "NONE".`;
           }
           if (f.kind === "budget") {
-            return `- ${f.name}: ${f.description} Devolvé el monto entero en dólares (USD). Acepta formatos como "200000", "200.000", "USD 200.000", "200 mil", "doscientos mil", "hasta 250000", "entre 200000 y 250000" (tomá el máximo). Si no hay un monto razonable, devolvé null.`;
+            return `- ${f.name}: ${f.description} Devolvé el monto entero en dólares (USD). Acepta formatos como "200000", "200.000", "USD 200.000", "200 mil", "doscientos mil", "hasta 250000", "entre 200000 y 250000" (tomá el máximo). Si no hay un monto razonable, devolvé 0.`;
           }
-          return `- ${f.name}: ${f.description} Devolvé solo el número. Si no se puede determinar, devolvé null.`;
+          return `- ${f.name}: ${f.description} Devolvé solo el número. Si no se puede determinar, devolvé 0.`;
         })
         .join("\n");
 
@@ -317,7 +317,7 @@ export const extractFields = createServerFn({ method: "POST" })
         model,
         output: Output.object({ schema }),
         system:
-          "Sos un asistente de una inmobiliaria uruguaya. Tu tarea es interpretar el último mensaje del usuario (usando el contexto de la conversación) y extraer los campos solicitados. Entendé lenguaje natural, sinónimos e intenciones implícitas (por ejemplo 'quiero una casa' -> tipo Casa). No inventes datos que el usuario no haya dado: si un campo no aparece o no es claro, devolvé null para ese campo.",
+          "Sos un asistente de una inmobiliaria uruguaya. Tu tarea es interpretar el último mensaje del usuario (usando el contexto de la conversación) y extraer los campos solicitados. Entendé lenguaje natural, sinónimos e intenciones implícitas (por ejemplo 'quiero una casa' -> tipo Casa). No inventes datos que el usuario no haya dado: si un campo no aparece o no es claro, devolvé el valor centinela indicado para ese campo.",
         messages: [
           ...historyMessages,
           {
