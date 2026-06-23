@@ -216,6 +216,7 @@ export function SearchBot() {
         500,
       );
       stepRef.current = 1;
+      lastAskedRef.current = "tipo";
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
