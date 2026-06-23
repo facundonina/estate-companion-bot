@@ -544,14 +544,35 @@ export function PropBot({
     startedRef.current = true;
     (async () => {
       const propDesc = `${property.tipo} en ${property.barrio}, ${property.departamento} (${formatPrice(property.precio, property.moneda)})`;
+      leadRef.current.zona = property.zona;
+      leadRef.current.tipo = property.tipo;
+
+      // Modo secundario: el usuario ya dejó sus datos y eligió ver otra
+      // propiedad recomendada. No le pedimos el formulario de nuevo: abrimos
+      // un chat con sus datos y le preguntamos si quiere avanzar por esta.
+      if (secondary) {
+        await botSay(
+          `Saludá a ${firstName(lead.nombre)} por su nombre, de forma cálida y como si ya se conocieran. Decile que viste que también se interesó en esta propiedad: ${propDesc}. Preguntale con entusiasmo si le gustaría avanzar por esta propiedad también. La tarjeta se muestra debajo de tu mensaje; no le pidas sus datos porque ya los tenés.`,
+          `¡Hola de nuevo, ${firstName(lead.nombre)}! Vimos que también te interesó esta propiedad. ¿Te gustaría avanzar por esta propiedad también?`,
+          {
+            card: property,
+            quickReplies: [
+              { label: "Sí, me interesa", value: "Sí" },
+              { label: "No, gracias", value: "No" },
+            ],
+          },
+          650,
+        );
+        secondaryConfirmRef.current = true;
+        return;
+      }
+
       await botSay(
         `Saludá a ${firstName(lead.nombre)} por su nombre y, con entusiasmo, contale que viste que se interesó en esta propiedad: ${propDesc}. Presentate brevemente como PropBot. No hagas preguntas todavía: la tarjeta de la propiedad se muestra debajo de tu mensaje.`,
         `¡Hola ${firstName(lead.nombre)}! Vi que te interesaste en esta propiedad:`,
         { card: property },
         650,
       );
-      leadRef.current.zona = property.zona;
-      leadRef.current.tipo = property.tipo;
       await new Promise((r) => setTimeout(r, 300));
       await botSay(
         "Decile que, antes de coordinar la visita, te gustaría conocer un par de cosas para asegurarte de que sea la mejor opción para él/ella. Después hacé UNA sola pregunta: con qué urgencia o para cuándo necesita concretar la compra.",
