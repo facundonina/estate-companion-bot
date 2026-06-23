@@ -497,3 +497,112 @@ export const interpretAnswer = createServerFn({ method: "POST" })
       return empty;
     }
   });
+
+// ===========================================================================
+// extractFields: extracción multi-campo usada por SearchBot (flujo de búsqueda
+// general). Interpreta el mensaje del usuario con Gemini y extrae, en una sola
+// llamada, todos los campos indicados. Devuelve siempre un objeto seguro.
+// ===========================================================================
+const fieldSpecSchema = z.object({
+  name: z.string().min(1).max(40),
+  kind: z.enum(["option", "number", "budget"]),
+  description: z.string().min(1).max(300),
+  options: z.array(z.string()).max(12).optional(),
+});
+
+const extractInputSchema = z.object({
+  history: z
+    .array(
+      z.object({
+        role: z.enum(["bot", "user"]),
+        text: z.string().max(2000),
+      }),
+    )
+    .max(24),
+  message: z.string().min(1).max(1000),
+  fields: z.array(fieldSpecSchema).min(1).max(8),
+});
+
+export interface ExtractResult {
+  values: Record<string, string | number | null>;
+}
+
+export const extractFields = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => extractInputSchema.parse(data))
+  .handler(async ({ data }): Promise<ExtractResult> => {
+    const empty: ExtractResult = {
+      values: Object.fromEntries(data.fields.map((f) => [f.name, null])),
+    };
+    try {
+      const provider = await getProvider();
+      if (!provider) return empty;
+      const model = provider(GEMINI_MODEL);
+
+      const { generateText, Output } = await import("ai");
+
+      const shape: Record<string, z.ZodTypeAny> = {};
+      for (const f of data.fields) {
+        shape[f.name] = f.kind === "option" ? z.string() : z.number();
+      }
+      const schema = z.object(shape);
+
+      const fieldDocs = data.fields
+        .map((f) => {
+          if (f.kind === "option") {
+            const opts = (f.options ?? []).map((o) => `"${o}"`).join(", ");
+            return `- ${f.name}: ${f.description} Devolvé EXACTAMENTE una de estas opciones: ${opts}. Si no se puede determinar a partir del mensaje, devolvé exactamente "NONE".`;
+          }
+          if (f.kind === "budget") {
+            return `- ${f.name}: ${f.description} Devolvé el monto entero en dólares (USD). Acepta formatos como "200000", "200.000", "USD 200.000", "200 mil", "doscientos mil", "hasta 250000", "entre 200000 y 250000" (tomá el máximo). Si no hay un monto razonable, devolvé 0.`;
+          }
+          return `- ${f.name}: ${f.description} Devolvé solo el número. Si no se puede determinar, devolvé 0.`;
+        })
+        .join("\n");
+
+      const historyMessages = data.history
+        .filter((m) => m.text.trim())
+        .map((m) => ({
+          role: (m.role === "user" ? "user" : "assistant") as
+            | "user"
+            | "assistant",
+          content: m.text,
+        }));
+
+      const { output } = await generateText({
+        model,
+        output: Output.object({ schema }),
+        system:
+          "Sos un asistente de una inmobiliaria uruguaya. Tu tarea es interpretar el último mensaje del usuario (usando el contexto de la conversación) y extraer los campos solicitados. Entendé lenguaje natural, sinónimos e intenciones implícitas (por ejemplo 'quiero una casa' -> tipo Casa). No inventes datos que el usuario no haya dado: si un campo no aparece o no es claro, devolvé el valor centinela indicado para ese campo.",
+        messages: [
+          ...historyMessages,
+          {
+            role: "user" as const,
+            content: `Campos a extraer:\n${fieldDocs}\n\nÚltimo mensaje del usuario: "${data.message}"`,
+          },
+        ],
+      });
+
+      const values: Record<string, string | number | null> = {};
+      for (const f of data.fields) {
+        const raw = (output as Record<string, unknown>)[f.name];
+        if (f.kind === "option") {
+          const picked = typeof raw === "string" ? raw.trim() : "";
+          const options = f.options ?? [];
+          const match = options.find(
+            (o) => o.toLowerCase() === picked.toLowerCase(),
+          );
+          values[f.name] = match ?? null;
+        } else {
+          const num =
+            typeof raw === "number" && Number.isFinite(raw) && raw > 0
+              ? Math.round(raw)
+              : null;
+          values[f.name] = num;
+        }
+      }
+      return { values };
+    } catch (err) {
+      console.error("[botAi] Error extrayendo campos:", err);
+      return empty;
+    }
+  });
