@@ -663,6 +663,44 @@ export function PropBot({
       addMsg({ role: "user", text });
       setInput("");
 
+      // Modo secundario: esperábamos que confirme si quiere avanzar también
+      // por esta propiedad. Ya tenemos sus datos, así que no pedimos formulario.
+      if (secondaryConfirmRef.current) {
+        secondaryConfirmRef.current = false;
+        if (!isAffirmative(text)) {
+          await botReply(
+            {
+              text: "¡Sin problema! Cualquier cosa que necesites, estoy por acá. 😊",
+            },
+            600,
+          );
+          setDone(true);
+          return;
+        }
+        const lead = leadRef.current;
+        // Si en un chat anterior ya nos dio su calificación, vamos directo a
+        // evaluar y coordinar la visita. Si no, arrancamos las preguntas.
+        if (lead.urgencia && lead.financiamiento && lead.presupuesto) {
+          await finalizeQualification();
+          return;
+        }
+        stepRef.current = 2;
+        lastAskedRef.current = "urgencia";
+        await botSay(
+          "El usuario quiere avanzar por esta propiedad. Decile que para asegurarte de que sea la mejor opción para él/ella querés conocer un par de cosas, y hacé UNA sola pregunta: con qué urgencia o para cuándo necesita concretar la compra (las opciones aparecen como botones debajo).",
+          "¡Buenísimo! Para asegurarme de que sea la mejor opción para vos, ¿cuándo necesitás concretar la compra?",
+          {
+            quickReplies: URGENCIA_OPCIONES.map((o) => ({
+              label: o,
+              value: o,
+            })),
+          },
+        );
+        return;
+      }
+
+
+
       // ¿Estábamos esperando que confirme si quiere hablar con un humano?
       if (awaitingHumanRef.current) {
         awaitingHumanRef.current = false;
