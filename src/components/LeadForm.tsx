@@ -68,7 +68,14 @@ export function LeadForm({ property }: { property: Property }) {
       setErrors(fieldErrors);
       return;
     }
-    // El lead se entrega al asistente del chat (PropBot) tras confirmar.
+    // Guardamos el lead para reutilizarlo en otras propiedades sin volver a
+    // pedir el formulario, y lo entregamos al asistente del chat (PropBot).
+    setStoredLead({
+      nombre: form.nombre,
+      telefono: form.telefono,
+      email: form.email,
+      mensaje: form.mensaje,
+    });
     setSubmitted(true);
     toast.success("¡Listo! Recibimos tus datos", {
       description: "Nuestro asistente se va a contactar contigo en breve.",
