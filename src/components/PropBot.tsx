@@ -838,59 +838,20 @@ export function PropBot({
         }
 
         // Tenemos urgencia, financiamiento y presupuesto: calificamos.
-        lastAskedRef.current = null;
-        lead.prioridad = calcPrioridad(lead);
-
-        const { ok, reasons } = qualifyForProperty(activePropRef.current, lead);
-
-        // No califica para esta propiedad: NO entregamos el lead.
-        // Lo derivamos a ver opciones que sí encajan.
-        if (!ok) {
-          const { cards } = recommendProps();
-          await botSay(
-            `Agradecele que te contó sus datos. Con tacto y sin mencionar ninguna calificación interna, explicale que esta propiedad puntual no sería la mejor opción para él/ella por estos motivos: ${reasons.join(
-              " y ",
-            )}.`,
-            `Gracias por contarme. Mirando lo que necesitás, ${reasons.join(
-              " y ",
-            )}. Por eso esta propiedad no sería la mejor opción para vos.`,
-            {},
-            500,
-          );
-          if (cards.length > 0) {
-            await new Promise((r) => setTimeout(r, 400));
-            await botSay(
-              "Presentale, con entusiasmo, estas otras opciones que sí encajan con su presupuesto y preferencias (se muestran como tarjetas debajo). Invitalo a tocar el botón 'Me interesa también' si alguna le gusta, para coordinar la visita.",
-              "Con tus preferencias, estas opciones sí encajan mejor. Si alguna te interesa, tocá “Me interesa también” y coordinamos la visita:",
-              { recCards: cards },
-            );
-          } else {
-            await new Promise((r) => setTimeout(r, 400));
-            await botSay(
-              lead.zona
-                ? `Explicale que por ahora en ${lead.zona} no tenés propiedades que se ajusten a su presupuesto, e invitalo a recorrer el catálogo completo por si encuentra algo que le guste. Debajo de tu mensaje hay un botón para verlo.`
-                : "Explicale que por ahora no tenés propiedades que se ajusten a su presupuesto y a lo que busca, e invitalo a recorrer el catálogo completo. Debajo de tu mensaje hay un botón para verlo.",
-              lead.zona
-                ? `Por ahora en ${lead.zona} no tenemos propiedades que se ajusten a tu presupuesto. De todos modos, te invito a recorrer todo nuestro catálogo por si encontrás algo que te guste 👇`
-                : "Por ahora no tenemos propiedades que se ajusten a tu presupuesto y a lo que estás buscando. De todos modos, te invito a recorrer todo nuestro catálogo por si encontrás algo que te guste 👇",
-              { cta: { label: "Ver propiedades disponibles" } },
-            );
-          }
-          setNotQualified(true);
-          return;
-        }
-
-        // Califica: entregamos el lead y coordinamos la visita.
-        void sendLeadToSheet(leadPayload(lead, activePropRef.current));
-        stepRef.current = 4;
-        await presentAgenda(
-          "El usuario calificó. Agradecele y proponele coordinar una visita presencial para conocer la propiedad. Pedile que elija uno de los horarios disponibles (se muestran como botones debajo).",
-          "¡Gracias! Podemos coordinar una visita para que la conozcas en persona. Elegí uno de los horarios disponibles:",
-        );
+        await finalizeQualification();
         return;
       }
     },
-    [addMsg, botReply, botSay, done, extract, presentAgenda, property, recommendProps, typing],
+    [
+      addMsg,
+      botReply,
+      botSay,
+      done,
+      extract,
+      finalizeQualification,
+      presentAgenda,
+      typing,
+    ],
   );
 
   const confirmSlot = useCallback(async () => {
