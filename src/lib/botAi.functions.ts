@@ -334,7 +334,7 @@ export const chatWithBot = createServerFn({ method: "POST" })
         // -------------------------------------------------------------------
         actualizar_perfil_lead: tool({
           description:
-            "Guarda los datos de calificación que van apareciendo en la charla (operación, financiación, presupuesto, urgencia, plazo de compra). Llamala apenas detectes alguno de estos datos. Corre en segundo plano: no bloquea ni demora tu respuesta.",
+            "Guarda los datos de calificación que van apareciendo en la charla (operación, método de pago, presupuesto, intención de compra). Llamala apenas detectes alguno de estos datos. Corre en segundo plano: no bloquea ni demora tu respuesta.",
           inputSchema: z.object({
             operacion: z
               .enum(["Venta", "Alquiler"])
@@ -342,33 +342,54 @@ export const chatWithBot = createServerFn({ method: "POST" })
               .describe(
                 "Operación que busca el usuario: 'Venta' si quiere comprar, 'Alquiler' si quiere alquilar.",
               ),
-            financiacion: z
+            metodo_pago_texto: z
               .string()
               .optional()
-              .describe("Cómo planea financiar (contado, crédito, etc.)"),
+              .describe(
+                "El texto literal que dijo el usuario sobre cómo piensa pagar, tal cual lo escribió o algo muy cercano.",
+              ),
+            metodo_pago_categoria: z
+              .enum([
+                "Efectivo listo",
+                "Crédito hipotecario aprobado",
+                "Crédito en trámite",
+                "No definido",
+              ])
+              .optional()
+              .describe(
+                "La categoría fija de método de pago que mejor corresponde a lo que dijo el usuario.",
+              ),
             presupuesto: z
               .number()
               .optional()
               .describe("Presupuesto aproximado en USD"),
-            urgencia: z
+            intencion_compra_texto: z
               .string()
               .optional()
-              .describe("Qué tan urgente es la compra"),
-            plazoCompra: z
-              .string()
+              .describe(
+                "El texto literal que dijo el usuario sobre para cuándo necesita la propiedad, tal cual lo escribió o algo muy cercano.",
+              ),
+            intencion_compra_categoria: z
+              .enum(["Menos de 3 meses", "3 a 6 meses", "En el año", "Sin definir"])
               .optional()
-              .describe("En cuánto tiempo planea comprar"),
+              .describe(
+                "La categoría fija de intención de compra / plazo de mudanza que mejor corresponde a lo que dijo el usuario.",
+              ),
           }),
           execute: async (patch) => {
             const clean: {
               operacion?: string;
-              financiamiento?: string;
+              metodoPagoTexto?: string;
+              metodoPagoCategoria?: string;
               presupuesto?: number;
-              urgencia?: string;
-              plazoCompra?: string;
+              intencionCompraTexto?: string;
+              intencionCompraCategoria?: string;
             } = {};
             if (patch.operacion) clean.operacion = patch.operacion;
-            if (patch.financiacion) clean.financiamiento = patch.financiacion;
+            if (patch.metodo_pago_texto)
+              clean.metodoPagoTexto = patch.metodo_pago_texto;
+            if (patch.metodo_pago_categoria)
+              clean.metodoPagoCategoria = patch.metodo_pago_categoria;
             if (typeof patch.presupuesto === "number" && patch.presupuesto > 0)
               clean.presupuesto = Math.round(patch.presupuesto);
             if (patch.urgencia) clean.urgencia = patch.urgencia;
