@@ -26,6 +26,8 @@ export const Route = createFileRoute("/propiedades/")({
   validateSearch: (search: Record<string, unknown>): PropSearch => ({
     q: typeof search.q === "string" ? search.q : undefined,
     tipo: typeof search.tipo === "string" ? search.tipo : undefined,
+    operacion:
+      typeof search.operacion === "string" ? search.operacion : undefined,
     departamento:
       typeof search.departamento === "string" ? search.departamento : undefined,
     dormitorios: search.dormitorios ? Number(search.dormitorios) : undefined,
