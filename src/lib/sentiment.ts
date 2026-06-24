@@ -91,3 +91,44 @@ export function isAffirmative(raw: string): boolean {
     t,
   );
 }
+
+// Frases con las que el usuario se despide explícitamente y da por terminada
+// la conversación.
+const FRASES_DESPEDIDA = [
+  "chau",
+  "chao",
+  "adios",
+  "adiós",
+  "nos vemos",
+  "hasta luego",
+  "hasta pronto",
+  "hasta la proxima",
+  "hasta la próxima",
+  "me voy",
+  "muchas gracias por todo",
+  "gracias por todo",
+  "gracias, eso es todo",
+  "eso es todo",
+  "ya esta",
+  "ya está",
+  "nada mas",
+  "nada más",
+  "buenas noches",
+  "que tengas buen dia",
+  "que tengas buen día",
+  "saludos",
+  "bye",
+  "good bye",
+  "goodbye",
+];
+
+export function isFarewell(raw: string): boolean {
+  const t = normalizar(raw).trim();
+  if (!t) return false;
+  const palabras = t.split(/[^a-zñ]+/i).filter(Boolean);
+  // "chau", "chao", "adios", "bye" como palabra suelta.
+  if (palabras.some((w) => ["chau", "chao", "adios", "bye"].includes(w))) {
+    return true;
+  }
+  return FRASES_DESPEDIDA.some((f) => t.includes(normalizar(f)));
+}

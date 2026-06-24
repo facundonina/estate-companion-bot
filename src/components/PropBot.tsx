@@ -11,9 +11,9 @@ import { Building2, Send, Calendar, Bath, BedDouble, Maximize, ArrowRight } from
 import { properties, type Property } from "@/data/properties";
 import { formatPrice } from "@/lib/format";
 import { propertyImage } from "@/lib/propertyImage";
-import { sendLeadRow, type LeadRow } from "@/lib/leadSheet";
+import { sendLeadRow, sendLeadBeacon, type LeadRow } from "@/lib/leadSheet";
 import { computeLeadScore } from "@/lib/leadScoring";
-import { isAngryMessage, isAffirmative } from "@/lib/sentiment";
+import { isAngryMessage, isAffirmative, isFarewell } from "@/lib/sentiment";
 import { mergeStoredLead } from "@/lib/leadStore";
 import {
   createCalendarEvent,
@@ -209,6 +209,10 @@ export function PropBot({
   const secondaryConfirmRef = useRef(false);
   // Marca si ya enviamos el lead al Sheet (para no duplicarlo).
   const leadSentRef = useRef(false);
+  // El usuario interactuó al menos una vez (mandó un mensaje o eligió horario).
+  const interactedRef = useRef(false);
+  // Timer de inactividad: registra el lead si pasan varios minutos sin actividad.
+  const inactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const chat = useServerFn(chatWithBot);
   const interpret = useServerFn(interpretAnswer);
@@ -358,7 +362,51 @@ export function PropBot({
     [],
   );
 
-  // Núcleo conversacional: en cada mensaje del usuario se envía el historial
+  // Registra el lead en la planilla con los datos MÁS ACTUALIZADOS del perfil.
+  // Se dispara recién al final de la conversación (reunión confirmada, despedida)
+  // o como red de seguridad (inactividad / cierre de pestaña, vía sendBeacon).
+  // Guardado con leadSentRef para no duplicar la fila.
+  const registerLead = useCallback((opts?: { beacon?: boolean }) => {
+    if (leadSentRef.current) return;
+    if (!interactedRef.current) return; // no registramos a quien nunca interactuó
+    leadSentRef.current = true;
+    if (inactivityTimerRef.current) {
+      clearTimeout(inactivityTimerRef.current);
+      inactivityTimerRef.current = null;
+    }
+    const row = buildLeadRow(leadRef.current, activePropRef.current);
+    if (opts?.beacon) sendLeadBeacon(row);
+    else void sendLeadRow(row);
+  }, []);
+
+  // Reinicia el temporizador de inactividad. Si pasan varios minutos sin que el
+  // usuario escriba, registramos el lead con sendBeacon (red de seguridad).
+  const bumpInactivity = useCallback(() => {
+    if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
+    const INACTIVITY_MS = 4 * 60 * 1000; // 4 minutos sin actividad
+    inactivityTimerRef.current = setTimeout(() => {
+      registerLead({ beacon: true });
+    }, INACTIVITY_MS);
+  }, [registerLead]);
+
+  // Red de seguridad: si la pestaña se cierra o queda oculta, mandamos el lead
+  // con navigator.sendBeacon (un fetch normal puede no completarse al cerrar).
+  useEffect(() => {
+    const onUnload = () => registerLead({ beacon: true });
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") registerLead({ beacon: true });
+    };
+    window.addEventListener("beforeunload", onUnload);
+    window.addEventListener("pagehide", onUnload);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("beforeunload", onUnload);
+      window.removeEventListener("pagehide", onUnload);
+      document.removeEventListener("visibilitychange", onVisibility);
+      if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
+    };
+  }, [registerLead]);
+
   // completo + el perfil acumulado + la propiedad activa a Gemini, que decide
   // qué herramientas usar. El cliente solo renderiza el texto y las acciones.
   const runBot = useCallback(
@@ -392,7 +440,6 @@ export function PropBot({
       }
 
       const extra: Omit<BotMessage, "id" | "role" | "text"> = {};
-      let agendaShown = false;
 
       for (const a of result?.actions ?? []) {
         if (a.type === "actualizar_perfil_lead") {
@@ -409,20 +456,15 @@ export function PropBot({
           if (a.slots.length) {
             setAvailableSlots(a.slots);
             extra.agenda = true;
-            agendaShown = true;
           }
-        } else if (a.type === "registrar_lead") {
-          // El servidor ya calculó el puntaje y escribió la fila en el Sheet.
-          leadSentRef.current = true;
         }
       }
 
-      // Fallback: si el modelo ofreció agendar pero no llamó a registrar_lead,
-      // escribimos el lead desde el cliente (puntaje calculado por el sistema).
-      if (agendaShown && !leadSentRef.current) {
-        leadSentRef.current = true;
-        void sendLeadRow(buildLeadRow(leadRef.current, activePropRef.current));
-      }
+      // El lead NO se registra acá: se registra recién al final de la
+      // conversación (reunión confirmada o despedida) o como red de seguridad
+      // (inactividad / cierre de pestaña), para mandar siempre los datos más
+      // actualizados del perfil.
+
 
       const text =
         (result?.text || "").trim() ||
@@ -486,6 +528,25 @@ export function PropBot({
       if (!text || typing) return;
       addMsg({ role: "user", text });
       setInput("");
+      // El usuario interactuó: habilita el registro y reinicia el temporizador
+      // de inactividad (red de seguridad).
+      interactedRef.current = true;
+      bumpInactivity();
+
+      // Despedida explícita: cerramos la conversación y registramos el lead con
+      // los datos más actualizados.
+      if (isFarewell(text)) {
+        await botReply(
+          {
+            text: "¡Gracias por tu tiempo! Cualquier cosa estoy por acá. ¡Que andes bien! 👋",
+          },
+          600,
+        );
+        registerLead();
+        setDone(true);
+        return;
+      }
+
 
       // Modo secundario: confirmación de avanzar por esta propiedad.
       if (secondaryConfirmRef.current) {
@@ -554,13 +615,14 @@ export function PropBot({
       // Conversación libre: la maneja Gemini con function calling.
       await runBot(text);
     },
-    [addMsg, botReply, done, runBot, typing],
+    [addMsg, botReply, done, runBot, typing, bumpInactivity, registerLead],
   );
 
   const confirmSlot = useCallback(async () => {
     if (!selectedSlot || slotConfirmed || confirming) return;
     const activeProp = activePropRef.current;
     setConfirming(true);
+    interactedRef.current = true;
     addMsg({
       role: "user",
       text: `Confirmo la visita para el ${selectedSlot.label} a las ${selectedSlot.time}`,
@@ -590,6 +652,10 @@ export function PropBot({
         500,
       );
       setDone(true);
+      // Reunión confirmada: registramos el lead con los datos más actualizados.
+      registerLead();
+
+
 
       // Una sola vez: ofrecemos otras propiedades que también podrían
       // interesarle.
@@ -615,7 +681,7 @@ export function PropBot({
         700,
       );
     }
-  }, [addMsg, botReply, botSay, confirming, recommendProps, selectedSlot, slotConfirmed]);
+  }, [addMsg, botReply, botSay, confirming, recommendProps, selectedSlot, slotConfirmed, registerLead]);
 
   return (
     <div className="flex h-[560px] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-card">

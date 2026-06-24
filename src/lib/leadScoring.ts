@@ -116,6 +116,14 @@ export function matchEnCatalogo(perfil: LeadProfileForScoring): boolean {
   });
 }
 
+// Indica si el lead ya tiene la plata disponible para comprar:
+// efectivo listo o crédito hipotecario aprobado. Tener la plata disponible
+// pesa más que cualquier otro factor para definir la prioridad.
+function plataDisponible(v: string | undefined): boolean {
+  const n = norm(v);
+  return n.includes("efectivo") || (n.includes("hipotecario") && n.includes("aprobad"));
+}
+
 /**
  * Calcula el puntaje (0–9) y la prioridad del lead con lógica de código pura.
  *
@@ -124,7 +132,13 @@ export function matchEnCatalogo(perfil: LeadProfileForScoring): boolean {
  *     intención de compra (0–3) + método de pago (0–3) +
  *     match en catálogo (0 o 2) + completitud de datos (0 o 1).
  *
- * Prioridad: >=6 Alta, 3–5 Media, <=2 Baja.
+ * Prioridad (Venta):
+ *   - Si tiene la plata disponible (efectivo listo o crédito hipotecario
+ *     aprobado) => Alta directamente, sin importar la urgencia ni los puntos.
+ *   - En cualquier otro caso (crédito en trámite o método sin definir) sale de
+ *     los cortes de siempre: >=6 Alta, 3–5 Media, <=2 Baja.
+ *
+ * El puntaje numérico NO cambia: siempre se calcula con los 4 factores.
  */
 export function computeLeadScore(
   perfil: LeadProfileForScoring,
@@ -155,7 +169,10 @@ export function computeLeadScore(
   const puntaje = pIntencion + pPago + pMatch + pCompletitud; // 0–9
 
   let prioridad: "Alta" | "Media" | "Baja";
-  if (puntaje >= 6) prioridad = "Alta";
+  if (plataDisponible(perfil.metodoPago)) {
+    // Plata disponible (efectivo o crédito hipotecario aprobado) => Alta directo.
+    prioridad = "Alta";
+  } else if (puntaje >= 6) prioridad = "Alta";
   else if (puntaje >= 3) prioridad = "Media";
   else prioridad = "Baja";
 
