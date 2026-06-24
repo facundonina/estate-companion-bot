@@ -344,109 +344,12 @@ export const chatWithBot = createServerFn({ method: "POST" })
             }
           },
         }),
-
-        // -------------------------------------------------------------------
-        registrar_lead: tool({
-          description:
-            "Registra al lead en la planilla de Leads con su perfil COMPLETO. El sistema calcula automáticamente el puntaje y la prioridad con lógica fija (no la IA). Llamala cuando el usuario confirme que quiere agendar una reunión, o cuando la conversación se corte sin agendar pero ya tengas al menos zona, presupuesto y método de pago. Pasá todos los datos que tengas; no inventes ninguno. NUNCA calcules ni menciones vos mismo un puntaje o una prioridad.",
-          inputSchema: z.object({
-            operacion: z
-              .enum(["Venta", "Alquiler"])
-              .optional()
-              .describe("Venta (compra) o Alquiler"),
-            zona: z.string().optional().describe("Zona o barrio de interés"),
-            tipo: z
-              .string()
-              .optional()
-              .describe("Tipo de propiedad (Apartamento, Casa, Lote, Campo)"),
-            presupuesto: z
-              .number()
-              .optional()
-              .describe("Presupuesto en USD"),
-            intencionCompra: z
-              .string()
-              .optional()
-              .describe(
-                "Intención de compra o plazo de mudanza (ej: 'Menos de 3 meses', '3 a 6 meses', 'En el año')",
-              ),
-            metodoPago: z
-              .string()
-              .optional()
-              .describe(
-                "Método de pago (ej: 'Efectivo listo', 'Crédito hipotecario aprobado', 'Crédito en trámite')",
-              ),
-            propiedadInteresId: z
-              .number()
-              .optional()
-              .describe(
-                "ID de la propiedad puntual en la que mostró interés concreto, si la hay",
-              ),
-            nombre: z.string().optional().describe("Nombre del lead"),
-            telefono: z.string().optional().describe("Teléfono del lead"),
-            email: z.string().optional().describe("Email del lead"),
-          }),
-          execute: async (perfil) => {
-            try {
-              const { computeLeadScore } = await import("@/lib/leadScoring");
-              const { writeLeadRowServer } = await import("@/lib/leadSheet");
-
-              const score = computeLeadScore({
-                operacion: perfil.operacion,
-                zona: perfil.zona,
-                tipo: perfil.tipo,
-                presupuesto: perfil.presupuesto,
-                intencionCompra: perfil.intencionCompra,
-                metodoPago: perfil.metodoPago,
-                propiedadInteresId: perfil.propiedadInteresId,
-                nombre: perfil.nombre,
-                telefono: perfil.telefono,
-                email: perfil.email,
-              });
-
-              const propRef =
-                perfil.propiedadInteresId != null
-                  ? properties.find((p) => p.id === perfil.propiedadInteresId)
-                  : activeProp;
-              const propiedadInteres = propRef
-                ? `${propRef.tipo} en ${propRef.barrio}, ${propRef.departamento} (#${propRef.id})`
-                : "";
-
-              await writeLeadRowServer({
-                fecha: new Date().toISOString(),
-                nombre: perfil.nombre ?? "",
-                telefono: perfil.telefono ?? "",
-                email: perfil.email ?? "",
-                zona: perfil.zona ?? "",
-                tipo: perfil.tipo ?? "",
-                presupuesto:
-                  typeof perfil.presupuesto === "number"
-                    ? perfil.presupuesto
-                    : "",
-                intencionCompra: perfil.intencionCompra ?? "",
-                metodoPago: perfil.metodoPago ?? "",
-                operacion: perfil.operacion ?? "",
-                propiedadInteres,
-                matchEnCatalogo: score.matchEnCatalogo ? "Sí" : "No",
-                puntaje: score.puntaje,
-                prioridad: score.prioridad,
-              });
-
-              actions.push({
-                type: "registrar_lead",
-                puntaje: score.puntaje,
-                prioridad: score.prioridad,
-                matchEnCatalogo: score.matchEnCatalogo,
-              });
-
-              // El modelo NO debe ver ni comunicar el puntaje/prioridad.
-              return { ok: true };
-            } catch (err) {
-              console.error("[botAi] registrar_lead:", err);
-              return { ok: false };
-            }
-          },
-        }),
+        // El registro del lead en la planilla lo hace el CLIENTE al final de la
+        // conversación (reunión confirmada, despedida, inactividad o cierre de
+        // pestaña), para mandar siempre los datos más actualizados. El modelo no
+        // dispone de una herramienta de registro.
       };
+
 
       // Contexto inyectado: propiedad activa + perfil acumulado.
       const contextLines: string[] = [];
