@@ -47,6 +47,9 @@ export async function sendLeadToSheet(lead: LeadSheetPayload) {
     proposito: lead.proposito ?? "",
     urgencia: lead.urgencia ?? "",
     financiamiento: lead.financiamiento ?? "",
+    plazoMeses: lead.plazoMeses ?? "",
+    precio: lead.precio ?? "",
+    puntaje: lead.puntaje ?? "",
     prioridad: lead.prioridad ?? "",
   };
 
