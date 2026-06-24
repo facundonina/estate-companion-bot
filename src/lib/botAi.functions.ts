@@ -33,19 +33,22 @@ Nunca inventes datos:
 Nunca inventes propiedades, precios, fechas de entrega, condiciones de financiación, ni datos de contacto que no vengan de buscar_propiedades, obtener_detalle_propiedad, o de la información que el propio usuario te dio en la charla. Si no tenés un dato (por ejemplo, la fecha de entrega exacta de una propiedad), decilo explícitamente en vez de inventarlo o responder con una frase genérica.
 
 Confirmación de interés en una propiedad puntual:
-En el momento exacto en que el usuario confirme interés concreto en una propiedad mostrada (por ejemplo, diciendo que le interesa, que le gusta, o similar), antes de cualquier otra cosa preguntale, en dos mensajes separados y en este orden, cómo piensa pagarla (contado, crédito ya aprobado, o crédito en trámite) y para cuándo la necesita (ya, en los próximos meses, o más adelante). Una vez que tengas esas dos respuestas, preguntale explícitamente: ¿querés ver una opción similar antes de decidir, o ya coordinamos la visita? No avances a ofrecer la visita ni el calendario hasta que el usuario elija una de esas dos opciones explícitamente.
+En el momento exacto en que el usuario confirme interés concreto en una propiedad mostrada (por ejemplo, diciendo que le interesa, que le gusta, o similar), antes de cualquier otra cosa preguntale, en dos mensajes separados y en este orden, cómo piensa pagarla y para cuándo la necesita. Una vez que tengas esas dos respuestas, preguntale explícitamente: ¿querés ver una opción similar antes de decidir, o ya coordinamos la visita? No avances a ofrecer la visita ni el calendario hasta que el usuario elija una de esas dos opciones explícitamente.
+
+Toda la interacción es conversacional en texto libre: no hay botones de respuesta rápida. Por eso, cada vez que tu mensaje espere que el usuario elija entre opciones (método de pago, plazo de mudanza, o la pregunta de cierre), presentá SIEMPRE las dos o tres opciones explícitamente dentro del texto de la pregunta, de modo que la respuesta no dependa de una sola palabra ambigua como "sí" o "dale". Por ejemplo: "¿la pensás pagar al contado o con crédito (ya aprobado o en trámite)?", "¿para cuándo la necesitás: ya, en los próximos meses, o más adelante?", "¿querés ver una opción similar antes de decidir, o ya coordinamos la visita?". Nunca cierres una pregunta de opciones de forma que solo se pueda contestar con "sí".
 
 Agendar reunión:
 Solo ofrecé agendar_reunion una vez que el usuario haya confirmado interés concreto en una propiedad puntual mostrada por buscar_propiedades, no apenas haya respondido las preguntas de calificación. Para ofrecer horarios SIEMPRE tenés que llamar a la herramienta agendar_reunion: ella consulta la agenda real y devuelve los turnos disponibles. Nunca escribas vos mismo horarios, fechas ni disponibilidad; si no llamaste a la herramienta, no menciones ni ofrezcas horarios concretos. La herramienta agendar_reunion solo devuelve turnos si el lead ya está calificado; si te responde con "faltanDatos", NO confirmes ninguna visita: preguntá esos datos primero y recién después volvé a ofrecer agendar.
+Si la herramienta agendar_reunion te responde con "derivarAsesor" (porque el método de pago del lead es "No definido"), NO ofrezcas coordinar una visita ni menciones el calendario: decile con calidez que un asesor se va a contactar para ayudarlo con los pasos de financiación, y seguí la charla con naturalidad.
 Nunca interpretes una respuesta corta y ambigua como "sí", "dale", "ok", o "bueno" como confirmación para agendar una visita o cerrar la conversación, salvo que ya tengas completos estos cuatro datos del lead: operación, presupuesto, intención de compra y método de pago. Si falta alguno, una respuesta afirmativa del usuario significa que quiere que sigas la calificación, no que reserves una visita. Además, evitá frases ambiguas como "¿querés que avancemos?" cuando lo que sigue es ofrecer agendar — en cambio, preguntá directamente la próxima pregunta de calificación pendiente.
 
 No repitas datos crudos de las herramientas:
-Nunca repitas en tu respuesta de texto el resultado crudo (JSON, array, ni ningún campo técnico) que te devuelve buscar_propiedades u obtener_detalle_propiedad. Esos datos siempre se muestran a través de la tarjeta visual de la propiedad. Tu respuesta en texto debe ser puramente conversacional — podés mencionar el nombre o la zona de la propiedad, pero nunca pegues el objeto de datos completo.
+Nunca repitas en tu respuesta de texto el resultado crudo (JSON, array, ni ningún campo técnico) de buscar_propiedades u obtener_detalle_propiedad, bajo ninguna circunstancia. Esos datos se muestran únicamente a través de la tarjeta visual de la propiedad, nunca como texto. Tu respuesta en texto debe ser puramente conversacional — podés mencionar el nombre o la zona de la propiedad, pero nunca pegues el objeto de datos, un array, un bloque JSON ni ningún campo técnico.
 
 Calificación del lead:
 Durante la conversación, identificá y guardá en el perfil del lead, vía actualizar_perfil_lead, estos campos a medida que vayan apareciendo: operación (si el usuario muestra interés en una propiedad puntual, la operación es la de esa propiedad y NO se la preguntes; solo preguntá si busca comprar o alquilar en charlas generales, cuando todavía no eligió ninguna propiedad puntual), zona, tipo de propiedad, presupuesto, intención de compra o plazo de mudanza, método de pago, y el ID de la propiedad puntual en la que el usuario mostró interés concreto entre los resultados de buscar_propiedades. El sistema registra al lead en la planilla automáticamente al final de la conversación (cuando se confirma la reunión o el usuario se despide); no tenés ninguna herramienta de registro, así que no intentes registrar nada vos mismo. Nunca calcules ni menciones vos mismo un puntaje o una categoría de prioridad — eso lo hace el sistema automáticamente, no es algo que tengas que decidir ni comunicar.
 
-Cuando el usuario te diga cómo piensa pagar o para cuándo necesita la propiedad, guardá tanto su frase literal como la categoría que mejor corresponda de la lista fija, interpretando sinónimos naturales (por ejemplo, al contado, tengo la plata, o en efectivo equivalen a Efectivo listo; lo antes posible, ya, o necesito mudarme ahora equivalen a Menos de 3 meses). Nunca dejes la categoría sin asignar si el usuario dio una respuesta que claramente corresponde a alguna de las cuatro opciones.`;
+Cuando el usuario te diga cómo piensa pagar o para cuándo necesita la propiedad, guardá su frase literal y además la categoría que mejor corresponda, interpretando sinónimos naturales (al contado, tengo la plata, en efectivo equivalen a Efectivo listo; lo antes posible, ya, necesito mudarme ahora equivalen a Menos de 3 meses; si el usuario dice que quiere crédito pero no inició ningún trámite con el banco, eso es No definido, no Crédito en trámite — esa categoría es solo para quien ya está en proceso activo con el banco). Nunca dejes la categoría sin asignar si el usuario dio una respuesta que claramente corresponde a alguna de las cuatro opciones.`;
 
 // Reglas de salida para la burbuja de chat.
 const STYLE_RULES = `Reglas de salida:
@@ -108,8 +111,25 @@ export function mapOperacion(text: string): "Venta" | "Alquiler" | null {
   return null;
 }
 
+// Red de seguridad en código (no solo en el prompt): elimina cualquier bloque de
+// datos estructurados (JSON, arrays, bloques de código, líneas tipo "campo: valor"
+// crudas) que el modelo haya podido pegar por error en su respuesta de texto. Los
+// datos de las propiedades se muestran SOLO a través de la tarjeta visual, nunca
+// como texto plano.
+function stripStructuredData(text: string): string {
+  let t = text;
+  // Bloques de código con fence ```...```.
+  t = t.replace(/```[\s\S]*?```/g, " ");
+  // Objetos JSON {...} y arrays [...] que contengan comillas y dos puntos/comas
+  // (señal de payload estructurado, no de una frase normal).
+  t = t.replace(/\{[^{}]*["'][^{}]*[:,][^{}]*\}/g, " ");
+  t = t.replace(/\[\s*\{[\s\S]*?\}\s*\]/g, " ");
+  // Limpieza de espacios sobrantes que pueda dejar el borrado.
+  t = t.replace(/[ \t]{2,}/g, " ").replace(/\n{3,}/g, "\n\n");
+  return t.trim();
+}
 
-// Resumen compacto de una propiedad para devolverle al modelo / al cliente.
+
 function propSummary(p: Property) {
   return {
     id: p.id,
@@ -409,6 +429,20 @@ export const chatWithBot = createServerFn({ method: "POST" })
             "Consulta la agenda REAL del vendedor y devuelve los turnos disponibles para coordinar una reunión/visita. Es la ÚNICA forma válida de ofrecer horarios: nunca escribas horarios o disponibilidad por tu cuenta. Usala SOLO cuando el usuario ya confirmó interés concreto en una propiedad puntual mostrada por buscar_propiedades. Antes de devolver turnos, el sistema verifica que el lead esté calificado (operación, presupuesto, intención de compra y método de pago); si falta algún dato, NO devuelve horarios.",
           inputSchema: z.object({}),
           execute: async () => {
+            // Si el método de pago del lead es "No definido" (quiere crédito pero
+            // todavía no inició ningún trámite), NO ofrecemos coordinar la visita
+            // ni mostramos el calendario: derivamos a un asesor para los pasos de
+            // financiación. El lead se registra igual por el flujo normal de fin
+            // de conversación, solo que sin generar un evento de calendario.
+            if (data.perfil.metodoPagoCategoria === "No definido") {
+              return {
+                reservaConfirmada: false,
+                puedeAgendar: false,
+                derivarAsesor: true,
+                instruccion:
+                  "El método de pago del lead es 'No definido'. NO ofrezcas coordinar una visita ni menciones el calendario. Decile con calidez que un asesor se va a contactar para ayudarlo con los pasos de financiación.",
+              };
+            }
             // VERIFICACIÓN EN CÓDIGO (no solo en el prompt): no se puede agendar
             // una visita sin tener el lead calificado. Si falta alguno de los 4
             // campos clave, no consultamos la agenda ni confirmamos: devolvemos
@@ -520,7 +554,7 @@ export const chatWithBot = createServerFn({ method: "POST" })
         stopWhen: stepCountIs(8),
       });
 
-      const text = (result.text || "").trim();
+      const text = stripStructuredData((result.text || "").trim());
 
       // Red de seguridad: si el modelo escribió un cierre ofreciendo coordinar
       // o agendar una reunión/visita pero NO llamó a la herramienta
@@ -603,7 +637,7 @@ export const generateBotMessage = createServerFn({ method: "POST" })
         messages,
       });
 
-      const clean = (text || "").trim();
+      const clean = stripStructuredData((text || "").trim());
       return { text: clean || null };
     } catch (err) {
       console.error("[botAi] Error generando mensaje:", err);

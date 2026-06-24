@@ -143,8 +143,10 @@ function plataDisponible(v: string | undefined): boolean {
  * Prioridad (Venta):
  *   - Si tiene la plata disponible (efectivo listo o crédito hipotecario
  *     aprobado) => Alta directamente, sin importar la urgencia ni los puntos.
- *   - En cualquier otro caso (crédito en trámite o método sin definir) sale de
- *     los cortes de siempre: >=6 Alta, 3–5 Media, <=2 Baja.
+ *   - Si el método de pago NO es efectivo listo ni crédito hipotecario aprobado
+ *     (crédito en trámite o sin definir), la prioridad NUNCA puede ser Alta: el
+ *     máximo es Media, y cae a Baja si el puntaje sin contar financiación
+ *     (urgencia + match + completitud) es 2 o menos.
  *
  * El puntaje numérico NO cambia: siempre se calcula con los 4 factores.
  */
@@ -180,9 +182,15 @@ export function computeLeadScore(
   if (plataDisponible(perfil.metodoPagoCategoria)) {
     // Plata disponible (efectivo o crédito hipotecario aprobado) => Alta directo.
     prioridad = "Alta";
-  } else if (puntaje >= 6) prioridad = "Alta";
-  else if (puntaje >= 3) prioridad = "Media";
-  else prioridad = "Baja";
+  } else {
+    // Tope de prioridad: si el método de pago NO es "Efectivo listo" ni
+    // "Crédito hipotecario aprobado" (es crédito en trámite o sin definir), la
+    // prioridad NUNCA puede ser Alta, sin importar el puntaje total. El máximo es
+    // Media, y cae a Baja si el puntaje sin contar financiación (urgencia + match
+    // + completitud) es muy bajo (2 o menos).
+    const sinFinanciacion = pIntencion + pMatch + pCompletitud;
+    prioridad = sinFinanciacion <= 2 ? "Baja" : "Media";
+  }
 
   return { puntaje, prioridad, matchEnCatalogo: match, esVenta };
 }

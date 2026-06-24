@@ -36,102 +36,6 @@ type LeadPatch = {
   intencionCompraCategoria?: string;
 };
 
-type QuickReply = { label: string; value: string; patch?: LeadPatch };
-
-// Normaliza texto (minúsculas, sin acentos) para detectar qué está preguntando
-// el bot en su mensaje generado.
-function botNorm(s: string): string {
-  return (s || "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
-}
-
-// A partir del texto que generó el bot, detecta si está haciendo una de las
-// preguntas de cierre/financiación/plazo y devuelve botones de respuesta rápida
-// (con el patch de perfil correspondiente) para evitar respuestas ambiguas.
-function detectQuickReplies(text: string): QuickReply[] | undefined {
-  const t = botNorm(text);
-  // Pregunta de cierre: ver una opción similar vs coordinar la visita.
-  if (t.includes("similar") && (t.includes("visita") || t.includes("coordin"))) {
-    return [
-      {
-        label: "Ver una opción similar",
-        value: "Prefiero ver una opción similar antes de decidir",
-      },
-      { label: "Coordinar la visita", value: "Ya quiero coordinar la visita" },
-    ];
-  }
-  // Pregunta de financiación / método de pago.
-  if (
-    (t.includes("pag") || t.includes("financ")) &&
-    (t.includes("contado") || t.includes("credito") || t.includes("efectivo"))
-  ) {
-    return [
-      {
-        label: "Contado",
-        value: "Lo pago al contado",
-        patch: {
-          metodoPagoTexto: "Lo pago al contado",
-          metodoPagoCategoria: "Efectivo listo",
-        },
-      },
-      {
-        label: "Crédito ya aprobado",
-        value: "Con crédito ya aprobado",
-        patch: {
-          metodoPagoTexto: "Con crédito ya aprobado",
-          metodoPagoCategoria: "Crédito hipotecario aprobado",
-        },
-      },
-      {
-        label: "Crédito en trámite",
-        value: "Con crédito en trámite",
-        patch: {
-          metodoPagoTexto: "Con crédito en trámite",
-          metodoPagoCategoria: "Crédito en trámite",
-        },
-      },
-    ];
-  }
-  // Pregunta de plazo: ¿para cuándo la necesitás?
-  if (
-    t.includes("cuando") &&
-    (t.includes("necesit") ||
-      t.includes("mudar") ||
-      t.includes("compr") ||
-      t.includes("para"))
-  ) {
-    return [
-      {
-        label: "Ya",
-        value: "La necesito ya",
-        patch: {
-          intencionCompraTexto: "La necesito ya",
-          intencionCompraCategoria: "Menos de 3 meses",
-        },
-      },
-      {
-        label: "En los próximos meses",
-        value: "En los próximos meses",
-        patch: {
-          intencionCompraTexto: "En los próximos meses",
-          intencionCompraCategoria: "3 a 6 meses",
-        },
-      },
-      {
-        label: "Más adelante",
-        value: "Más adelante",
-        patch: {
-          intencionCompraTexto: "Más adelante",
-          intencionCompraCategoria: "En el año",
-        },
-      },
-    ];
-  }
-  return undefined;
-}
-
 type Slot = CalendarSlot;
 
 interface BotMessage {
@@ -142,7 +46,7 @@ interface BotMessage {
   cards?: Property[];
   recCards?: Property[];
   agenda?: boolean;
-  quickReplies?: QuickReply[];
+  
   cta?: { label: string };
 }
 
@@ -614,13 +518,8 @@ export function PropBot({
         (result?.text || "").trim() ||
         "Perdón, no te entendí bien. ¿Me lo contás de nuevo?";
 
-      // Si el bot está haciendo la pregunta de financiación, plazo o la de
-      // cierre (ver opción similar / coordinar visita), ofrecemos botones de
-      // respuesta rápida para evitar respuestas cortas y ambiguas.
-      if (!extra.quickReplies) {
-        const qr = detectQuickReplies(text);
-        if (qr) extra.quickReplies = qr;
-      }
+
+
 
       await new Promise((r) => setTimeout(r, 300));
       setTyping(false);
@@ -651,10 +550,6 @@ export function PropBot({
           `¡Hola de nuevo, ${firstName(lead.nombre)}! Vimos que también te interesó esta propiedad. ¿Te gustaría avanzar por esta propiedad también?`,
           {
             card: property,
-            quickReplies: [
-              { label: "Sí, me interesa", value: "Sí, me interesa esta propiedad" },
-              { label: "No, gracias", value: "No, gracias" },
-            ],
           },
           650,
         );
@@ -667,10 +562,6 @@ export function PropBot({
         `¡Hola ${firstName(lead.nombre)}! Soy tu asesor para esta propiedad. ¿Te interesa avanzar con esta propiedad o tenés alguna duda primero?`,
         {
           card: property,
-          quickReplies: [
-            { label: "Me interesa", value: "Me interesa esta propiedad" },
-            { label: "Tengo una duda", value: "Tengo una duda" },
-          ],
         },
         650,
       );
@@ -749,11 +640,7 @@ export function PropBot({
         awaitingHumanRef.current = true;
         await botReply(
           {
-            text: "Tranquilo, te noto un poco frustrado 😟. ¿Querés que te ponga en contacto con un humano de nuestro equipo?",
-            quickReplies: [
-              { label: "Sí, hablar con un humano", value: "Sí" },
-              { label: "No, seguir acá", value: "No" },
-            ],
+            text: "Tranquilo, te noto un poco frustrado 😟. ¿Querés que te ponga en contacto con un humano de nuestro equipo, o preferís que sigamos por acá?",
           },
           600,
         );
@@ -776,16 +663,7 @@ export function PropBot({
     [addMsg, botReply, done, runBot, typing, bumpInactivity, registerLead],
   );
 
-  // Click en un botón de respuesta rápida: si el botón trae un patch de perfil
-  // (financiación/plazo), lo aplicamos directo para no depender de interpretar
-  // texto libre, y mandamos el valor como mensaje del usuario.
-  const handleQuickReply = useCallback(
-    (qr: QuickReply) => {
-      if (qr.patch) applyPatch(qr.patch);
-      void handleSend(qr.value);
-    },
-    [applyPatch, handleSend],
-  );
+
 
 
 
@@ -965,20 +843,6 @@ export function PropBot({
                         ? "Confirmando..."
                         : "Confirmar visita"}
                   </button>
-                </div>
-              )}
-              {m.quickReplies && !typing && m === messages[messages.length - 1] && (
-                <div className="flex flex-wrap gap-1.5">
-                  {m.quickReplies.map((qr) => (
-                    <button
-                      key={qr.value}
-                      type="button"
-                      onClick={() => handleQuickReply(qr)}
-                      className="rounded-full border border-border bg-card px-3 py-1.5 text-[12px] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                    >
-                      {qr.label}
-                    </button>
-                  ))}
                 </div>
               )}
             </div>
