@@ -207,10 +207,8 @@ export function PropBot({
 }: {
   property: Property;
   lead: BotLead & {
-    metodoPagoTexto?: string;
-    metodoPagoCategoria?: string;
-    intencionCompraTexto?: string;
-    intencionCompraCategoria?: string;
+    metodoPago?: string;
+    intencionCompra?: string;
     presupuesto?: number;
     prioridad?: string;
   };
