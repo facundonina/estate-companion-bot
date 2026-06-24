@@ -762,6 +762,18 @@ export const interpretAnswer = createServerFn({ method: "POST" })
         const s = str(v);
         return s && allowed.includes(s) ? s : null;
       };
+      const catMetodoPago = (v: unknown) => {
+        const s = normalizeMetodoPagoCategoria(str(v) ?? undefined);
+        return s &&
+          [
+            "Efectivo listo",
+            "Crédito hipotecario aprobado",
+            "Crédito en trámite",
+            "Sin iniciar",
+          ].includes(s)
+          ? s
+          : null;
+      };
       const presupuestoRaw = output.presupuesto ?? output.presupuestoUSD;
       const num =
         typeof presupuestoRaw === "number" && presupuestoRaw > 0
@@ -771,12 +783,7 @@ export const interpretAnswer = createServerFn({ method: "POST" })
       return {
         operacion: operacionDet ?? str(output.operacion),
         metodoPagoTexto: str(output.metodoPagoTexto),
-        metodoPagoCategoria: cat(output.metodoPagoCategoria, [
-          "Efectivo listo",
-          "Crédito hipotecario aprobado",
-          "Crédito en trámite",
-          "Sin iniciar",
-        ]),
+        metodoPagoCategoria: catMetodoPago(output.metodoPagoCategoria),
         presupuesto: num,
         intencionCompraTexto: str(output.intencionCompraTexto),
         intencionCompraCategoria: cat(output.intencionCompraCategoria, [
