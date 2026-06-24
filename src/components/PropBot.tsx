@@ -342,6 +342,7 @@ export function PropBot({
   // Aplica al perfil un patch de calificación y lo persiste (no bloquea).
   const applyPatch = useCallback(
     (patch: {
+      operacion?: string;
       financiamiento?: string;
       presupuesto?: number;
       urgencia?: string;
@@ -349,6 +350,10 @@ export function PropBot({
     }) => {
       const l = leadRef.current;
       let changed = false;
+      if (patch.operacion) {
+        l.operacion = patch.operacion;
+        changed = true;
+      }
       if (patch.financiamiento) {
         l.financiamiento = patch.financiamiento;
         changed = true;
