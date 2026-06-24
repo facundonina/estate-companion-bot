@@ -550,10 +550,11 @@ export const interpretAnswer = createServerFn({ method: "POST" })
             presupuesto: z.number(),
             urgencia: z.string(),
             plazoCompra: z.string(),
+            plazoMeses: z.number(),
           }),
         }),
         system:
-          "Sos un asistente de una inmobiliaria uruguaya. Extraé del último mensaje del usuario (usando el contexto) SOLO datos de calificación: financiación (cómo paga), presupuesto en USD, urgencia y plazo de compra. No inventes: si un dato no aparece, devolvé \"NONE\" para los textos y 0 para el presupuesto.",
+          "Sos un asistente de una inmobiliaria uruguaya. Extraé del último mensaje del usuario (usando el contexto) SOLO datos de calificación: financiación (cómo paga), presupuesto en USD, urgencia, plazo de compra (texto) y plazoMeses (el plazo convertido a un número ENTERO de meses exacto: 'en 2 meses' -> 2, 'en 8 meses' -> 8, 'este año' -> 12, 'en 2 años' -> 24, 'ya'/'urgente' -> 1). No inventes: si un dato no aparece, devolvé \"NONE\" para los textos y 0 para los números (presupuesto y plazoMeses).",
         messages: [
           ...historyMessages,
           {
@@ -571,12 +572,17 @@ export const interpretAnswer = createServerFn({ method: "POST" })
         typeof output.presupuesto === "number" && output.presupuesto > 0
           ? Math.round(output.presupuesto)
           : null;
+      const plazoMeses =
+        typeof output.plazoMeses === "number" && output.plazoMeses > 0
+          ? Math.round(output.plazoMeses)
+          : null;
 
       return {
         financiamiento: str(output.financiamiento),
         presupuesto: num,
         urgencia: str(output.urgencia),
         plazoCompra: str(output.plazoCompra),
+        plazoMeses,
       };
     } catch (err) {
       console.error("[botAi] Error interpretando respuesta:", err);
