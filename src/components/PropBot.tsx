@@ -29,10 +29,11 @@ export interface BotLead {
 
 type LeadPatch = {
   operacion?: string;
-  financiamiento?: string;
+  metodoPagoTexto?: string;
+  metodoPagoCategoria?: string;
   presupuesto?: number;
-  urgencia?: string;
-  plazoCompra?: string;
+  intencionCompraTexto?: string;
+  intencionCompraCategoria?: string;
 };
 
 type QuickReply = { label: string; value: string; patch?: LeadPatch };
