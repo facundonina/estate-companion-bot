@@ -29,11 +29,9 @@ export interface BotLead {
 
 type LeadPatch = {
   operacion?: string;
-  metodoPagoTexto?: string;
-  metodoPagoCategoria?: string;
+  metodoPago?: string;
   presupuesto?: number;
-  intencionCompraTexto?: string;
-  intencionCompraCategoria?: string;
+  intencionCompra?: string;
 };
 
 type Slot = CalendarSlot;
