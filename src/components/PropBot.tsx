@@ -98,6 +98,7 @@ function calcPrioridad(lead: BotLeadState): string {
 function buildLeadRow(lead: BotLeadState, prop: Property): LeadRow {
   const intencion = lead.urgencia || lead.plazoCompra || "";
   const metodoPago = lead.financiamiento || "";
+  const operacion = lead.operacion || prop.operacion;
   const score = computeLeadScore({
     operacion: prop.operacion,
     zona: lead.zona,
