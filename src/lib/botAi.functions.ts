@@ -444,12 +444,15 @@ export const chatWithBot = createServerFn({ method: "POST" })
         p.operacion ? `operación: ${p.operacion}` : null,
         p.ubicacion ? `ubicación de interés: ${p.ubicacion}` : null,
         p.tipo ? `tipo de interés: ${p.tipo}` : null,
-        p.financiamiento ? `financiación: ${p.financiamiento}` : null,
+        p.metodoPagoTexto
+          ? `método de pago: ${p.metodoPagoTexto}${p.metodoPagoCategoria ? ` (${p.metodoPagoCategoria})` : ""}`
+          : null,
         typeof p.presupuesto === "number"
           ? `presupuesto: USD ${p.presupuesto.toLocaleString("es-UY")}`
           : null,
-        p.urgencia ? `urgencia: ${p.urgencia}` : null,
-        p.plazoCompra ? `plazo de compra: ${p.plazoCompra}` : null,
+        p.intencionCompraTexto
+          ? `intención de compra: ${p.intencionCompraTexto}${p.intencionCompraCategoria ? ` (${p.intencionCompraCategoria})` : ""}`
+          : null,
       ].filter(Boolean);
       contextLines.push(
         perfilLines.length
