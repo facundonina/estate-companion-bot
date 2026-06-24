@@ -43,7 +43,7 @@ function Index() {
       .filter((p) => p.operacion !== "Alquiler")
       .map((p) => p.precio),
   );
-  const [chatOpen, setChatOpen] = useState(false);
+  
 
   return (
     <div className="min-h-screen bg-background">
