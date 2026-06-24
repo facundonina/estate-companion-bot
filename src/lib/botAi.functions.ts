@@ -75,8 +75,9 @@ function propSummary(p: Property) {
   return {
     id: p.id,
     tipo: p.tipo,
+    operacion: p.operacion,
     ubicacion: `${p.barrio}, ${p.departamento}`,
-    precio: formatPrice(p.precio, p.moneda),
+    precio: formatPrice(p.precio, p.moneda) + (p.operacion === "Alquiler" ? "/mes" : ""),
     dormitorios: p.dormitorios,
     m2: p.superficieTotal,
     estado: p.estado,
