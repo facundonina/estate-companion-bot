@@ -27,7 +27,91 @@ export interface BotLead {
   mensaje?: string;
 }
 
-type QuickReply = { label: string; value: string };
+type LeadPatch = {
+  operacion?: string;
+  financiamiento?: string;
+  presupuesto?: number;
+  urgencia?: string;
+  plazoCompra?: string;
+};
+
+type QuickReply = { label: string; value: string; patch?: LeadPatch };
+
+// Normaliza texto (minúsculas, sin acentos) para detectar qué está preguntando
+// el bot en su mensaje generado.
+function botNorm(s: string): string {
+  return (s || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+// A partir del texto que generó el bot, detecta si está haciendo una de las
+// preguntas de cierre/financiación/plazo y devuelve botones de respuesta rápida
+// (con el patch de perfil correspondiente) para evitar respuestas ambiguas.
+function detectQuickReplies(text: string): QuickReply[] | undefined {
+  const t = botNorm(text);
+  // Pregunta de cierre: ver una opción similar vs coordinar la visita.
+  if (t.includes("similar") && (t.includes("visita") || t.includes("coordin"))) {
+    return [
+      {
+        label: "Ver una opción similar",
+        value: "Prefiero ver una opción similar antes de decidir",
+      },
+      { label: "Coordinar la visita", value: "Ya quiero coordinar la visita" },
+    ];
+  }
+  // Pregunta de financiación / método de pago.
+  if (
+    (t.includes("pag") || t.includes("financ")) &&
+    (t.includes("contado") || t.includes("credito") || t.includes("efectivo"))
+  ) {
+    return [
+      {
+        label: "Contado",
+        value: "Lo pago al contado",
+        patch: { financiamiento: "Efectivo listo" },
+      },
+      {
+        label: "Crédito ya aprobado",
+        value: "Con crédito ya aprobado",
+        patch: { financiamiento: "Crédito hipotecario aprobado" },
+      },
+      {
+        label: "Crédito en trámite",
+        value: "Con crédito en trámite",
+        patch: { financiamiento: "Crédito en trámite" },
+      },
+    ];
+  }
+  // Pregunta de plazo: ¿para cuándo la necesitás?
+  if (
+    t.includes("cuando") &&
+    (t.includes("necesit") ||
+      t.includes("mudar") ||
+      t.includes("compr") ||
+      t.includes("para"))
+  ) {
+    return [
+      {
+        label: "Ya",
+        value: "La necesito ya",
+        patch: { urgencia: "Menos de 3 meses" },
+      },
+      {
+        label: "En los próximos meses",
+        value: "En los próximos meses",
+        patch: { urgencia: "3 a 6 meses" },
+      },
+      {
+        label: "Más adelante",
+        value: "Más adelante",
+        patch: { urgencia: "Más adelante" },
+      },
+    ];
+  }
+  return undefined;
+}
 
 type Slot = CalendarSlot;
 
@@ -443,6 +527,9 @@ export function PropBot({
         .then((patch) => {
           if (!patch) return;
           applyPatch({
+            // La operación solo se aplica desde una charla general; si ya hay
+            // una propiedad puntual elegida, su operación manda (se fijó al abrir).
+            operacion: patch.operacion ?? undefined,
             financiamiento: patch.financiamiento ?? undefined,
             presupuesto: patch.presupuesto ?? undefined,
             urgencia: patch.urgencia ?? undefined,
@@ -450,6 +537,7 @@ export function PropBot({
           });
         })
         .catch(() => {});
+
 
       setTyping(true);
       let result: { text: string | null; actions: BotAction[] } | null = null;
@@ -496,9 +584,18 @@ export function PropBot({
         (result?.text || "").trim() ||
         "Perdón, no te entendí bien. ¿Me lo contás de nuevo?";
 
+      // Si el bot está haciendo la pregunta de financiación, plazo o la de
+      // cierre (ver opción similar / coordinar visita), ofrecemos botones de
+      // respuesta rápida para evitar respuestas cortas y ambiguas.
+      if (!extra.quickReplies) {
+        const qr = detectQuickReplies(text);
+        if (qr) extra.quickReplies = qr;
+      }
+
       await new Promise((r) => setTimeout(r, 300));
       setTyping(false);
       addMsg({ role: "bot", text, ...extra });
+
     },
     [chat, interpret, fullHistory, buildPerfil, applyPatch, addMsg],
   );
@@ -511,6 +608,10 @@ export function PropBot({
       const propDesc = `${property.tipo} en ${property.barrio}, ${property.departamento} (${formatPrice(property.precio, property.moneda)})`;
       leadRef.current.zona = property.zona;
       leadRef.current.tipo = property.tipo;
+      // El usuario llegó a través de una propiedad puntual: la operación es la
+      // de esa propiedad (Venta o Alquiler). La completamos automáticamente y
+      // NO se la preguntamos.
+      leadRef.current.operacion = property.operacion;
 
       // Modo secundario: el usuario ya dejó sus datos y eligió ver otra
       // propiedad recomendada. No le pedimos el formulario de nuevo.
@@ -521,8 +622,8 @@ export function PropBot({
           {
             card: property,
             quickReplies: [
-              { label: "Sí, me interesa", value: "Sí" },
-              { label: "No, gracias", value: "No" },
+              { label: "Sí, me interesa", value: "Sí, me interesa esta propiedad" },
+              { label: "No, gracias", value: "No, gracias" },
             ],
           },
           650,
@@ -532,17 +633,18 @@ export function PropBot({
       }
 
       await botSay(
-        `Sos vos, el asesor inmobiliario, quien escribe este mensaje (no el usuario). Saludá a ${firstName(lead.nombre)} por su nombre, presentate en una frase como asesor y mencioná brevemente que se interesó en esta propiedad: ${propDesc}. Inmediatamente después arrancá con la PRIMERA pregunta de calificación del flujo: si está buscando comprar o alquilar. Es una sola pregunta, breve, en tono rioplatense. La tarjeta de la propiedad se muestra debajo de tu mensaje, no la repitas en texto.`,
-        `¡Hola ${firstName(lead.nombre)}! Soy tu asesor para esta propiedad. Para arrancar, contame: ¿la estás buscando para comprar o para alquilar?`,
+        `Sos vos, el asesor inmobiliario, quien escribe este mensaje (no el usuario). Saludá a ${firstName(lead.nombre)} por su nombre, presentate en una frase como asesor y mencioná brevemente que se interesó en esta propiedad: ${propDesc}. NO le preguntes si busca comprar o alquilar: ya sabemos que esta propiedad es en ${property.operacion}. Cerrá preguntándole de forma cálida y breve si le interesa avanzar con esta propiedad o si tiene alguna duda primero. La tarjeta de la propiedad se muestra debajo de tu mensaje, no la repitas en texto.`,
+        `¡Hola ${firstName(lead.nombre)}! Soy tu asesor para esta propiedad. ¿Te interesa avanzar con esta propiedad o tenés alguna duda primero?`,
         {
           card: property,
           quickReplies: [
-            { label: "Comprar", value: "Comprar" },
-            { label: "Alquilar", value: "Alquilar" },
+            { label: "Me interesa", value: "Me interesa esta propiedad" },
+            { label: "Tengo una duda", value: "Tengo una duda" },
           ],
         },
         650,
       );
+
 
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -643,6 +745,19 @@ export function PropBot({
     },
     [addMsg, botReply, done, runBot, typing, bumpInactivity, registerLead],
   );
+
+  // Click en un botón de respuesta rápida: si el botón trae un patch de perfil
+  // (financiación/plazo), lo aplicamos directo para no depender de interpretar
+  // texto libre, y mandamos el valor como mensaje del usuario.
+  const handleQuickReply = useCallback(
+    (qr: QuickReply) => {
+      if (qr.patch) applyPatch(qr.patch);
+      void handleSend(qr.value);
+    },
+    [applyPatch, handleSend],
+  );
+
+
 
   const confirmSlot = useCallback(async () => {
     if (!selectedSlot || slotConfirmed || confirming) return;
@@ -828,7 +943,7 @@ export function PropBot({
                     <button
                       key={qr.value}
                       type="button"
-                      onClick={() => handleSend(qr.value)}
+                      onClick={() => handleQuickReply(qr)}
                       className="rounded-full border border-border bg-card px-3 py-1.5 text-[12px] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
                     >
                       {qr.label}

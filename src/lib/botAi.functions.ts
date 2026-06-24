@@ -14,7 +14,7 @@ Orden de calificación del lead:
 Para calificar al lead, seguí este orden de preguntas, una por vez, de forma conversacional y sin sonar a formulario: primero preguntá la zona de interés, después el rango de precio que está dispuesto a pagar, después si tiene urgencia o fecha en la que necesita mudarse, y por último cómo piensa financiar la compra (contado o crédito). No preguntes algo que el usuario ya respondió antes, aunque haya sido espontáneamente. Apenas detectes alguno de estos datos, guardalo con actualizar_perfil_lead.
 
 Catálogo (importante):
-El catálogo real incluye propiedades en VENTA y en ALQUILER, en varios departamentos: Montevideo, Maldonado (Punta del Este, La Barra, José Ignacio, La Paloma, La Pedrera, Punta del Diablo, Aguas Dulces), Canelones (Ciudad de la Costa, Atlántida, Las Piedras), Colonia (Colonia del Sacramento, Carmelo, Nueva Palmira) y del interior (Salto, Paysandú, Rivera, Tacuarembó, Durazno). Hay apartamentos, casas, lotes y campos. Los precios de ALQUILER son mensuales (cifras bajas, cientos o pocos miles de USD por mes) y NO se comparan con los de VENTA (decenas o cientos de miles de USD). Detectá si el usuario quiere comprar o alquilar y pasá el parámetro 'operacion' ("Venta" o "Alquiler") a buscar_propiedades; si no queda claro, preguntalo. Nunca mezcles precios de venta con los de alquiler.
+El catálogo real incluye propiedades en VENTA y en ALQUILER, en varios departamentos: Montevideo, Maldonado (Punta del Este, La Barra, José Ignacio, La Paloma, La Pedrera, Punta del Diablo, Aguas Dulces), Canelones (Ciudad de la Costa, Atlántida, Las Piedras), Colonia (Colonia del Sacramento, Carmelo, Nueva Palmira) y del interior (Salto, Paysandú, Rivera, Tacuarembó, Durazno). Hay apartamentos, casas, lotes y campos. Los precios de ALQUILER son mensuales (cifras bajas, cientos o pocos miles de USD por mes) y NO se comparan con los de VENTA (decenas o cientos de miles de USD). Pasá el parámetro 'operacion' ("Venta" o "Alquiler") a buscar_propiedades. Si el usuario está interesado en una propiedad puntual ya mostrada, la operación es la de esa propiedad: tomala automáticamente y NO se la preguntes. Solo preguntá si busca comprar o alquilar cuando esté charlando en general, sin haber elegido todavía ninguna propiedad puntual. Reconocé sinónimos: "comprar", "comprarla", "compra" = Venta; "alquilar", "rentar", "alquilarla" = Alquiler. Nunca mezcles precios de venta con los de alquiler.
 
 Recomendación de propiedades (sistema de prioridad por tiers de zona):
 Para recomendar propiedades en Montevideo, seguí este sistema de prioridad por tiers de zona, basado en el catálogo real:
@@ -32,6 +32,9 @@ Cuando el usuario pida una zona específica con un presupuesto, primero buscá e
 Nunca inventes datos:
 Nunca inventes propiedades, precios, fechas de entrega, condiciones de financiación, ni datos de contacto que no vengan de buscar_propiedades, obtener_detalle_propiedad, o de la información que el propio usuario te dio en la charla. Si no tenés un dato (por ejemplo, la fecha de entrega exacta de una propiedad), decilo explícitamente en vez de inventarlo o responder con una frase genérica.
 
+Confirmación de interés en una propiedad puntual:
+En el momento exacto en que el usuario confirme interés concreto en una propiedad mostrada (por ejemplo, diciendo que le interesa, que le gusta, o similar), antes de cualquier otra cosa preguntale, en dos mensajes separados y en este orden, cómo piensa pagarla (contado, crédito ya aprobado, o crédito en trámite) y para cuándo la necesita (ya, en los próximos meses, o más adelante). Una vez que tengas esas dos respuestas, preguntale explícitamente: ¿querés ver una opción similar antes de decidir, o ya coordinamos la visita? No avances a ofrecer la visita ni el calendario hasta que el usuario elija una de esas dos opciones explícitamente.
+
 Agendar reunión:
 Solo ofrecé agendar_reunion una vez que el usuario haya confirmado interés concreto en una propiedad puntual mostrada por buscar_propiedades, no apenas haya respondido las preguntas de calificación. Para ofrecer horarios SIEMPRE tenés que llamar a la herramienta agendar_reunion: ella consulta la agenda real y devuelve los turnos disponibles. Nunca escribas vos mismo horarios, fechas ni disponibilidad; si no llamaste a la herramienta, no menciones ni ofrezcas horarios concretos. La herramienta agendar_reunion solo devuelve turnos si el lead ya está calificado; si te responde con "faltanDatos", NO confirmes ninguna visita: preguntá esos datos primero y recién después volvé a ofrecer agendar.
 Nunca interpretes una respuesta corta y ambigua como "sí", "dale", "ok", o "bueno" como confirmación para agendar una visita o cerrar la conversación, salvo que ya tengas completos estos cuatro datos del lead: operación, presupuesto, intención de compra y método de pago. Si falta alguno, una respuesta afirmativa del usuario significa que quiere que sigas la calificación, no que reserves una visita. Además, evitá frases ambiguas como "¿querés que avancemos?" cuando lo que sigue es ofrecer agendar — en cambio, preguntá directamente la próxima pregunta de calificación pendiente.
@@ -40,7 +43,7 @@ No repitas datos crudos de las herramientas:
 Nunca repitas en tu respuesta de texto el resultado crudo (JSON, array, ni ningún campo técnico) que te devuelve buscar_propiedades u obtener_detalle_propiedad. Esos datos siempre se muestran a través de la tarjeta visual de la propiedad. Tu respuesta en texto debe ser puramente conversacional — podés mencionar el nombre o la zona de la propiedad, pero nunca pegues el objeto de datos completo.
 
 Calificación del lead:
-Durante la conversación, identificá y guardá en el perfil del lead, vía actualizar_perfil_lead, estos campos a medida que vayan apareciendo: operación (preguntá siempre primero si busca comprar o alquilar, antes de preguntar zona o presupuesto), zona, tipo de propiedad, presupuesto, intención de compra o plazo de mudanza, método de pago, y el ID de la propiedad puntual en la que el usuario mostró interés concreto entre los resultados de buscar_propiedades. El sistema registra al lead en la planilla automáticamente al final de la conversación (cuando se confirma la reunión o el usuario se despide); no tenés ninguna herramienta de registro, así que no intentes registrar nada vos mismo. Nunca calcules ni menciones vos mismo un puntaje o una categoría de prioridad — eso lo hace el sistema automáticamente, no es algo que tengas que decidir ni comunicar.`;
+Durante la conversación, identificá y guardá en el perfil del lead, vía actualizar_perfil_lead, estos campos a medida que vayan apareciendo: operación (si el usuario muestra interés en una propiedad puntual, la operación es la de esa propiedad y NO se la preguntes; solo preguntá si busca comprar o alquilar en charlas generales, cuando todavía no eligió ninguna propiedad puntual), zona, tipo de propiedad, presupuesto, intención de compra o plazo de mudanza, método de pago, y el ID de la propiedad puntual en la que el usuario mostró interés concreto entre los resultados de buscar_propiedades. El sistema registra al lead en la planilla automáticamente al final de la conversación (cuando se confirma la reunión o el usuario se despide); no tenés ninguna herramienta de registro, así que no intentes registrar nada vos mismo. Nunca calcules ni menciones vos mismo un puntaje o una categoría de prioridad — eso lo hace el sistema automáticamente, no es algo que tengas que decidir ni comunicar.`;
 
 // Reglas de salida para la burbuja de chat.
 const STYLE_RULES = `Reglas de salida:
@@ -82,6 +85,27 @@ function norm(s: string): string {
     .replace(/[\u0300-\u036f]/g, "")
     .trim();
 }
+
+// Mapea la respuesta del usuario sobre la operación a "Venta" o "Alquiler",
+// reconociendo sinónimos comunes (comprar/compra -> Venta; alquilar/rentar ->
+// Alquiler), no solo las palabras exactas "venta"/"alquiler".
+export function mapOperacion(text: string): "Venta" | "Alquiler" | null {
+  const n = norm(text);
+  if (
+    /\b(comprar|comprarla|comprarlo|comprarlos|comprarme|comprando|compra|compro|adquirir|adquirirla|venta|vender)\b/.test(
+      n,
+    )
+  )
+    return "Venta";
+  if (
+    /\b(alquilar|alquilarla|alquilarlo|alquilando|alquiler|alquilo|rentar|rentarla|rentarlo|renta|arrendar|arriendo)\b/.test(
+      n,
+    )
+  )
+    return "Alquiler";
+  return null;
+}
+
 
 // Resumen compacto de una propiedad para devolverle al modelo / al cliente.
 function propSummary(p: Property) {
@@ -558,6 +582,7 @@ export const generateBotMessage = createServerFn({ method: "POST" })
 // pregunta ni controla el flujo. Devuelve siempre un objeto seguro.
 // ===========================================================================
 export interface ProfilePatch {
+  operacion: string | null;
   financiamiento: string | null;
   presupuesto: number | null;
   urgencia: string | null;
@@ -579,12 +604,18 @@ const interpretInputSchema = z.object({
 export const interpretAnswer = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => interpretInputSchema.parse(data))
   .handler(async ({ data }): Promise<ProfilePatch> => {
+    // Detección determinística de la operación a partir de sinónimos comunes
+    // (comprar/compra -> Venta; alquilar/rentar -> Alquiler). Es independiente
+    // de la IA: garantiza que "comprar" no se pierda aunque el modelo falle.
+    const operacionDet = mapOperacion(data.message);
     const empty: ProfilePatch = {
+      operacion: operacionDet,
       financiamiento: null,
       presupuesto: null,
       urgencia: null,
       plazoCompra: null,
     };
+
     try {
       const provider = await getProvider();
       if (!provider) return empty;
@@ -605,6 +636,7 @@ export const interpretAnswer = createServerFn({ method: "POST" })
         model,
         output: Output.object({
           schema: z.object({
+            operacion: z.string(),
             financiamiento: z.string(),
             presupuesto: z.number(),
             urgencia: z.string(),
@@ -612,7 +644,7 @@ export const interpretAnswer = createServerFn({ method: "POST" })
           }),
         }),
         system:
-          "Sos un asistente de una inmobiliaria uruguaya. Extraé del último mensaje del usuario (usando el contexto) SOLO datos de calificación: financiación (cómo paga), presupuesto en USD, urgencia y plazo de compra. No inventes: si un dato no aparece, devolvé \"NONE\" para los textos y 0 para el presupuesto.",
+          "Sos un asistente de una inmobiliaria uruguaya. Extraé del último mensaje del usuario (usando el contexto) SOLO datos de calificación: operación (devolvé \"Venta\" si quiere comprar -comprar, comprarla, compra-, \"Alquiler\" si quiere alquilar -alquilar, rentar, alquilarla-), financiación (cómo paga), presupuesto en USD, urgencia y plazo de compra. No inventes: si un dato no aparece, devolvé \"NONE\" para los textos y 0 para el presupuesto.",
         messages: [
           ...historyMessages,
           {
@@ -620,6 +652,7 @@ export const interpretAnswer = createServerFn({ method: "POST" })
             content: `Último mensaje del usuario: "${data.message}"`,
           },
         ],
+
       });
 
       const str = (v: unknown) => {
@@ -632,11 +665,13 @@ export const interpretAnswer = createServerFn({ method: "POST" })
           : null;
 
       return {
+        operacion: operacionDet ?? str(output.operacion),
         financiamiento: str(output.financiamiento),
         presupuesto: num,
         urgencia: str(output.urgencia),
         plazoCompra: str(output.plazoCompra),
       };
+
     } catch (err) {
       console.error("[botAi] Error interpretando respuesta:", err);
       return empty;
