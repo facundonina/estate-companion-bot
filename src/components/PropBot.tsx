@@ -376,6 +376,7 @@ export function PropBot({
             presupuesto: patch.presupuesto ?? undefined,
             urgencia: patch.urgencia ?? undefined,
             plazoCompra: patch.plazoCompra ?? undefined,
+            plazoMeses: patch.plazoMeses ?? undefined,
           });
         })
         .catch(() => {});
@@ -394,13 +395,20 @@ export function PropBot({
         console.error("[PropBot] chatWithBot:", err);
       }
 
+      const actions = result?.actions ?? [];
+
+      // Primero aplicamos los cambios de perfil para que el puntaje esté
+      // actualizado antes de decidir si habilitamos la agenda.
+      for (const a of actions) {
+        if (a.type === "actualizar_perfil_lead") applyPatch(a.patch);
+      }
+
       const extra: Omit<BotMessage, "id" | "role" | "text"> = {};
+      let scheduleOffered = false;
       let agendaShown = false;
 
-      for (const a of result?.actions ?? []) {
-        if (a.type === "actualizar_perfil_lead") {
-          applyPatch(a.patch);
-        } else if (a.type === "buscar_propiedades") {
+      for (const a of actions) {
+        if (a.type === "buscar_propiedades") {
           const cards = a.ids
             .map((id) => properties.find((p) => p.id === id))
             .filter((p): p is Property => Boolean(p));
@@ -409,7 +417,10 @@ export function PropBot({
           const p = properties.find((x) => x.id === a.id);
           if (p && p.id !== activePropRef.current.id) extra.card = p;
         } else if (a.type === "agendar_reunion") {
-          if (a.slots.length) {
+          scheduleOffered = true;
+          // Solo los leads de prioridad ALTA pueden agendar directamente.
+          const prioridad = recomputeScore();
+          if (prioridad === "Alta" && a.slots.length) {
             setAvailableSlots(a.slots);
             extra.agenda = true;
             agendaShown = true;
@@ -417,21 +428,37 @@ export function PropBot({
         }
       }
 
-      // Si el modelo ofreció agendar, el lead califica: lo enviamos al Sheet.
-      if (agendaShown && !leadSentRef.current) {
+      // Cuando el bot ofrece coordinar una visita, el lead califica y se envía
+      // al Sheet (una sola vez), con su puntaje y prioridad.
+      if (scheduleOffered && !leadSentRef.current) {
         leadSentRef.current = true;
         void sendLeadToSheet(leadPayload(leadRef.current, activePropRef.current));
       }
 
-      const text =
+      let text =
         (result?.text || "").trim() ||
         "Perdón, no te entendí bien. ¿Me lo contás de nuevo?";
+
+      // Si se ofreció agendar pero el lead NO es prioridad Alta, no mostramos el
+      // selector de horarios: queda como lead para que el vendedor lo contacte.
+      if (scheduleOffered && !agendaShown) {
+        text =
+          "¡Genial que te interese! 🙌 Ya registré tu consulta y uno de nuestros asesores se va a poner en contacto con vos a la brevedad para coordinar la visita.";
+      }
 
       await new Promise((r) => setTimeout(r, 300));
       setTyping(false);
       addMsg({ role: "bot", text, ...extra });
     },
-    [chat, interpret, fullHistory, buildPerfil, applyPatch, addMsg],
+    [
+      chat,
+      interpret,
+      fullHistory,
+      buildPerfil,
+      applyPatch,
+      addMsg,
+      recomputeScore,
+    ],
   );
 
   // Kick off the conversation once.
