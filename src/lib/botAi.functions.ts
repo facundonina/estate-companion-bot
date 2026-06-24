@@ -412,6 +412,20 @@ export const chatWithBot = createServerFn({ method: "POST" })
             "Consulta la agenda REAL del vendedor y devuelve los turnos disponibles para coordinar una reunión/visita. Es la ÚNICA forma válida de ofrecer horarios: nunca escribas horarios o disponibilidad por tu cuenta. Usala SOLO cuando el usuario ya confirmó interés concreto en una propiedad puntual mostrada por buscar_propiedades. Antes de devolver turnos, el sistema verifica que el lead esté calificado (operación, presupuesto, intención de compra y método de pago); si falta algún dato, NO devuelve horarios.",
           inputSchema: z.object({}),
           execute: async () => {
+            // Si el método de pago del lead es "No definido" (quiere crédito pero
+            // todavía no inició ningún trámite), NO ofrecemos coordinar la visita
+            // ni mostramos el calendario: derivamos a un asesor para los pasos de
+            // financiación. El lead se registra igual por el flujo normal de fin
+            // de conversación, solo que sin generar un evento de calendario.
+            if (data.perfil.metodoPagoCategoria === "No definido") {
+              return {
+                reservaConfirmada: false,
+                puedeAgendar: false,
+                derivarAsesor: true,
+                instruccion:
+                  "El método de pago del lead es 'No definido'. NO ofrezcas coordinar una visita ni menciones el calendario. Decile con calidez que un asesor se va a contactar para ayudarlo con los pasos de financiación.",
+              };
+            }
             // VERIFICACIÓN EN CÓDIGO (no solo en el prompt): no se puede agendar
             // una visita sin tener el lead calificado. Si falta alguno de los 4
             // campos clave, no consultamos la agenda ni confirmamos: devolvemos
