@@ -34,23 +34,72 @@ export interface LeadRow {
   prioridad: string;
 }
 
-// Construye el body que entiende el Apps Script (claves = columnas).
+// Construye el body que entiende el Apps Script.
+// Enviamos los datos de TRES formas para máxima compatibilidad con el writer
+// de la planilla, garantizando que Puntaje, Match en Catálogo y Propiedad de
+// Interés nunca lleguen vacíos:
+//   1) claves camelCase (compatibilidad con la versión anterior),
+//   2) alias con el nombre EXACTO de cada columna de la planilla,
+//   3) un array "valores"/"values" en el MISMO orden que las columnas.
 function buildBody(row: LeadRow) {
+  const presupuesto = row.presupuesto ?? "";
+  const matchEnCatalogo = row.matchEnCatalogo ?? "";
+  const puntaje = row.puntaje ?? "";
+  const prioridad = row.prioridad ?? "";
+  const propiedadInteres = row.propiedadInteres ?? "";
+
+  // Fila ordenada según las columnas de la planilla "Leads".
+  const valores = [
+    row.fecha ?? "",
+    row.nombre ?? "",
+    row.telefono ?? "",
+    row.email ?? "",
+    row.zona ?? "",
+    row.tipo ?? "",
+    presupuesto,
+    row.intencionCompra ?? "",
+    row.metodoPago ?? "",
+    row.operacion ?? "",
+    propiedadInteres,
+    matchEnCatalogo,
+    puntaje,
+    prioridad,
+  ];
+
   return {
+    // 1) Claves camelCase
     fecha: row.fecha,
     nombre: row.nombre ?? "",
     telefono: row.telefono ?? "",
     email: row.email ?? "",
     zona: row.zona ?? "",
     tipo: row.tipo ?? "",
-    presupuesto: row.presupuesto ?? "",
+    presupuesto,
     intencionCompra: row.intencionCompra ?? "",
     metodoPago: row.metodoPago ?? "",
     operacion: row.operacion ?? "",
-    propiedadInteres: row.propiedadInteres ?? "",
-    matchEnCatalogo: row.matchEnCatalogo ?? "",
-    puntaje: row.puntaje ?? "",
-    prioridad: row.prioridad ?? "",
+    propiedadInteres,
+    matchEnCatalogo,
+    puntaje,
+    prioridad,
+    // 2) Alias con el nombre EXACTO de cada columna
+    Fecha: row.fecha,
+    Nombre: row.nombre ?? "",
+    "Teléfono": row.telefono ?? "",
+    Email: row.email ?? "",
+    Zona: row.zona ?? "",
+    Tipo: row.tipo ?? "",
+    "Presupuesto (USD)": presupuesto,
+    "Intención de compra": row.intencionCompra ?? "",
+    "Método de pago": row.metodoPago ?? "",
+    "Operación": row.operacion ?? "",
+    "Propiedad de Interés": propiedadInteres,
+    "Match en Catálogo": matchEnCatalogo,
+    Puntaje: puntaje,
+    Prioridad: prioridad,
+    // 3) Fila ordenada por si el Apps Script hace appendRow(values)
+    valores,
+    values: valores,
   };
 }
 
