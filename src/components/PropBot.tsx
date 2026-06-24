@@ -615,7 +615,7 @@ export function PropBot({
       // Conversación libre: la maneja Gemini con function calling.
       await runBot(text);
     },
-    [addMsg, botReply, done, runBot, typing],
+    [addMsg, botReply, done, runBot, typing, bumpInactivity, registerLead],
   );
 
   const confirmSlot = useCallback(async () => {
