@@ -392,8 +392,10 @@ export const chatWithBot = createServerFn({ method: "POST" })
               clean.metodoPagoCategoria = patch.metodo_pago_categoria;
             if (typeof patch.presupuesto === "number" && patch.presupuesto > 0)
               clean.presupuesto = Math.round(patch.presupuesto);
-            if (patch.urgencia) clean.urgencia = patch.urgencia;
-            if (patch.plazoCompra) clean.plazoCompra = patch.plazoCompra;
+            if (patch.intencion_compra_texto)
+              clean.intencionCompraTexto = patch.intencion_compra_texto;
+            if (patch.intencion_compra_categoria)
+              clean.intencionCompraCategoria = patch.intencion_compra_categoria;
             actions.push({ type: "actualizar_perfil_lead", patch: clean });
             return { ok: true };
           },
