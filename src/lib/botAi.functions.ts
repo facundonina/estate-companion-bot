@@ -111,8 +111,25 @@ export function mapOperacion(text: string): "Venta" | "Alquiler" | null {
   return null;
 }
 
+// Red de seguridad en código (no solo en el prompt): elimina cualquier bloque de
+// datos estructurados (JSON, arrays, bloques de código, líneas tipo "campo: valor"
+// crudas) que el modelo haya podido pegar por error en su respuesta de texto. Los
+// datos de las propiedades se muestran SOLO a través de la tarjeta visual, nunca
+// como texto plano.
+function stripStructuredData(text: string): string {
+  let t = text;
+  // Bloques de código con fence ```...```.
+  t = t.replace(/```[\s\S]*?```/g, " ");
+  // Objetos JSON {...} y arrays [...] que contengan comillas y dos puntos/comas
+  // (señal de payload estructurado, no de una frase normal).
+  t = t.replace(/\{[^{}]*["'][^{}]*[:,][^{}]*\}/g, " ");
+  t = t.replace(/\[\s*\{[\s\S]*?\}\s*\]/g, " ");
+  // Limpieza de espacios sobrantes que pueda dejar el borrado.
+  t = t.replace(/[ \t]{2,}/g, " ").replace(/\n{3,}/g, "\n\n");
+  return t.trim();
+}
 
-// Resumen compacto de una propiedad para devolverle al modelo / al cliente.
+
 function propSummary(p: Property) {
   return {
     id: p.id,
