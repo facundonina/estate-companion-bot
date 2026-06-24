@@ -362,7 +362,51 @@ export function PropBot({
     [],
   );
 
-  // Núcleo conversacional: en cada mensaje del usuario se envía el historial
+  // Registra el lead en la planilla con los datos MÁS ACTUALIZADOS del perfil.
+  // Se dispara recién al final de la conversación (reunión confirmada, despedida)
+  // o como red de seguridad (inactividad / cierre de pestaña, vía sendBeacon).
+  // Guardado con leadSentRef para no duplicar la fila.
+  const registerLead = useCallback((opts?: { beacon?: boolean }) => {
+    if (leadSentRef.current) return;
+    if (!interactedRef.current) return; // no registramos a quien nunca interactuó
+    leadSentRef.current = true;
+    if (inactivityTimerRef.current) {
+      clearTimeout(inactivityTimerRef.current);
+      inactivityTimerRef.current = null;
+    }
+    const row = buildLeadRow(leadRef.current, activePropRef.current);
+    if (opts?.beacon) sendLeadBeacon(row);
+    else void sendLeadRow(row);
+  }, []);
+
+  // Reinicia el temporizador de inactividad. Si pasan varios minutos sin que el
+  // usuario escriba, registramos el lead con sendBeacon (red de seguridad).
+  const bumpInactivity = useCallback(() => {
+    if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
+    const INACTIVITY_MS = 4 * 60 * 1000; // 4 minutos sin actividad
+    inactivityTimerRef.current = setTimeout(() => {
+      registerLead({ beacon: true });
+    }, INACTIVITY_MS);
+  }, [registerLead]);
+
+  // Red de seguridad: si la pestaña se cierra o queda oculta, mandamos el lead
+  // con navigator.sendBeacon (un fetch normal puede no completarse al cerrar).
+  useEffect(() => {
+    const onUnload = () => registerLead({ beacon: true });
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") registerLead({ beacon: true });
+    };
+    window.addEventListener("beforeunload", onUnload);
+    window.addEventListener("pagehide", onUnload);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("beforeunload", onUnload);
+      window.removeEventListener("pagehide", onUnload);
+      document.removeEventListener("visibilitychange", onVisibility);
+      if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
+    };
+  }, [registerLead]);
+
   // completo + el perfil acumulado + la propiedad activa a Gemini, que decide
   // qué herramientas usar. El cliente solo renderiza el texto y las acciones.
   const runBot = useCallback(
