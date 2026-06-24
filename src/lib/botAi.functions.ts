@@ -33,7 +33,8 @@ Nunca inventes datos:
 Nunca inventes propiedades, precios, fechas de entrega, condiciones de financiación, ni datos de contacto que no vengan de buscar_propiedades, obtener_detalle_propiedad, o de la información que el propio usuario te dio en la charla. Si no tenés un dato (por ejemplo, la fecha de entrega exacta de una propiedad), decilo explícitamente en vez de inventarlo o responder con una frase genérica.
 
 Agendar reunión:
-Solo ofrecé agendar_reunion una vez que el usuario haya confirmado interés concreto en una propiedad puntual mostrada por buscar_propiedades, no apenas haya respondido las preguntas de calificación. Para ofrecer horarios SIEMPRE tenés que llamar a la herramienta agendar_reunion: ella consulta la agenda real y devuelve los turnos disponibles. Nunca escribas vos mismo horarios, fechas ni disponibilidad; si no llamaste a la herramienta, no menciones ni ofrezcas horarios concretos.
+Solo ofrecé agendar_reunion una vez que el usuario haya confirmado interés concreto en una propiedad puntual mostrada por buscar_propiedades, no apenas haya respondido las preguntas de calificación. Para ofrecer horarios SIEMPRE tenés que llamar a la herramienta agendar_reunion: ella consulta la agenda real y devuelve los turnos disponibles. Nunca escribas vos mismo horarios, fechas ni disponibilidad; si no llamaste a la herramienta, no menciones ni ofrezcas horarios concretos. La herramienta agendar_reunion solo devuelve turnos si el lead ya está calificado; si te responde con "faltanDatos", NO confirmes ninguna visita: preguntá esos datos primero y recién después volvé a ofrecer agendar.
+Nunca interpretes una respuesta corta y ambigua como "sí", "dale", "ok", o "bueno" como confirmación para agendar una visita o cerrar la conversación, salvo que ya tengas completos estos cuatro datos del lead: operación, presupuesto, intención de compra y método de pago. Si falta alguno, una respuesta afirmativa del usuario significa que quiere que sigas la calificación, no que reserves una visita. Además, evitá frases ambiguas como "¿querés que avancemos?" cuando lo que sigue es ofrecer agendar — en cambio, preguntá directamente la próxima pregunta de calificación pendiente.
 
 No repitas datos crudos de las herramientas:
 Nunca repitas en tu respuesta de texto el resultado crudo (JSON, array, ni ningún campo técnico) que te devuelve buscar_propiedades u obtener_detalle_propiedad. Esos datos siempre se muestran a través de la tarjeta visual de la propiedad. Tu respuesta en texto debe ser puramente conversacional — podés mencionar el nombre o la zona de la propiedad, pero nunca pegues el objeto de datos completo.
@@ -134,6 +135,7 @@ export type BotAction =
   | {
       type: "actualizar_perfil_lead";
       patch: {
+        operacion?: string;
         financiamiento?: string;
         presupuesto?: number;
         urgencia?: string;
@@ -149,6 +151,7 @@ export interface ChatResult {
 
 const perfilSchema = z.object({
   nombre: z.string().max(120).optional(),
+  operacion: z.string().max(40).optional(),
   ubicacion: z.string().max(120).optional(),
   tipo: z.string().max(60).optional(),
   urgencia: z.string().max(120).optional(),
@@ -156,6 +159,21 @@ const perfilSchema = z.object({
   presupuesto: z.number().optional(),
   plazoCompra: z.string().max(120).optional(),
 });
+
+type PerfilLead = z.infer<typeof perfilSchema>;
+
+// Calificación mínima exigida ANTES de poder confirmar/ofrecer una visita.
+// Devuelve la lista de campos que faltan (vacía => se puede agendar).
+function camposFaltantesParaAgendar(perfil: PerfilLead): string[] {
+  const faltan: string[] = [];
+  if (!perfil.operacion) faltan.push("operación (compra o alquiler)");
+  if (typeof perfil.presupuesto !== "number" || perfil.presupuesto <= 0)
+    faltan.push("presupuesto");
+  if (!perfil.urgencia && !perfil.plazoCompra)
+    faltan.push("intención de compra o plazo de mudanza");
+  if (!perfil.financiamiento) faltan.push("método de pago");
+  return faltan;
+}
 
 const chatInputSchema = z.object({
   // Historial COMPLETO de la conversación (no solo el último mensaje).
@@ -284,8 +302,14 @@ export const chatWithBot = createServerFn({ method: "POST" })
         // -------------------------------------------------------------------
         actualizar_perfil_lead: tool({
           description:
-            "Guarda los datos de calificación que van apareciendo en la charla (financiación, presupuesto, urgencia, plazo de compra). Llamala apenas detectes alguno de estos datos. Corre en segundo plano: no bloquea ni demora tu respuesta.",
+            "Guarda los datos de calificación que van apareciendo en la charla (operación, financiación, presupuesto, urgencia, plazo de compra). Llamala apenas detectes alguno de estos datos. Corre en segundo plano: no bloquea ni demora tu respuesta.",
           inputSchema: z.object({
+            operacion: z
+              .enum(["Venta", "Alquiler"])
+              .optional()
+              .describe(
+                "Operación que busca el usuario: 'Venta' si quiere comprar, 'Alquiler' si quiere alquilar.",
+              ),
             financiacion: z
               .string()
               .optional()
@@ -305,11 +329,13 @@ export const chatWithBot = createServerFn({ method: "POST" })
           }),
           execute: async (patch) => {
             const clean: {
+              operacion?: string;
               financiamiento?: string;
               presupuesto?: number;
               urgencia?: string;
               plazoCompra?: string;
             } = {};
+            if (patch.operacion) clean.operacion = patch.operacion;
             if (patch.financiacion) clean.financiamiento = patch.financiacion;
             if (typeof patch.presupuesto === "number" && patch.presupuesto > 0)
               clean.presupuesto = Math.round(patch.presupuesto);
@@ -323,9 +349,25 @@ export const chatWithBot = createServerFn({ method: "POST" })
         // -------------------------------------------------------------------
         agendar_reunion: tool({
           description:
-            "Consulta la agenda REAL del vendedor y devuelve los turnos disponibles para coordinar una reunión/visita. Es la ÚNICA forma válida de ofrecer horarios: nunca escribas horarios o disponibilidad por tu cuenta. Usala SOLO cuando el usuario ya confirmó interés concreto en una propiedad puntual mostrada por buscar_propiedades.",
+            "Consulta la agenda REAL del vendedor y devuelve los turnos disponibles para coordinar una reunión/visita. Es la ÚNICA forma válida de ofrecer horarios: nunca escribas horarios o disponibilidad por tu cuenta. Usala SOLO cuando el usuario ya confirmó interés concreto en una propiedad puntual mostrada por buscar_propiedades. Antes de devolver turnos, el sistema verifica que el lead esté calificado (operación, presupuesto, intención de compra y método de pago); si falta algún dato, NO devuelve horarios.",
           inputSchema: z.object({}),
           execute: async () => {
+            // VERIFICACIÓN EN CÓDIGO (no solo en el prompt): no se puede agendar
+            // una visita sin tener el lead calificado. Si falta alguno de los 4
+            // campos clave, no consultamos la agenda ni confirmamos: devolvemos
+            // una señal con los campos faltantes para que el modelo los pregunte.
+            const faltan = camposFaltantesParaAgendar(data.perfil);
+            if (faltan.length) {
+              return {
+                reservaConfirmada: false,
+                puedeAgendar: false,
+                faltanDatos: faltan,
+                instruccion:
+                  "No confirmes ni ofrezcas la visita todavía. Antes tenés que calificar al lead: faltan estos datos -> " +
+                  faltan.join(", ") +
+                  ". Preguntá de forma conversacional el primero que falte y no vuelvas a ofrecer agendar hasta tenerlos todos.",
+              };
+            }
             try {
               const { getAvailableSlotsCore } = await import(
                 "@/lib/calendar.server"
@@ -333,6 +375,8 @@ export const chatWithBot = createServerFn({ method: "POST" })
               const slots = await getAvailableSlotsCore();
               actions.push({ type: "agendar_reunion", slots });
               return {
+                reservaConfirmada: true,
+                puedeAgendar: true,
                 disponibles: slots.length,
                 horarios: slots
                   .slice(0, 8)
@@ -365,6 +409,7 @@ export const chatWithBot = createServerFn({ method: "POST" })
       const p = data.perfil;
       const perfilLines = [
         p.nombre ? `nombre: ${p.nombre}` : null,
+        p.operacion ? `operación: ${p.operacion}` : null,
         p.ubicacion ? `ubicación de interés: ${p.ubicacion}` : null,
         p.tipo ? `tipo de interés: ${p.tipo}` : null,
         p.financiamiento ? `financiación: ${p.financiamiento}` : null,
@@ -378,6 +423,12 @@ export const chatWithBot = createServerFn({ method: "POST" })
         perfilLines.length
           ? `Perfil acumulado del lead: ${perfilLines.join("; ")}.`
           : "Perfil del lead: todavía no hay datos de calificación.",
+      );
+      const faltanParaAgendar = camposFaltantesParaAgendar(p);
+      contextLines.push(
+        faltanParaAgendar.length
+          ? `Faltan datos para poder agendar una visita: ${faltanParaAgendar.join(", ")}. No ofrezcas ni confirmes una visita hasta tenerlos todos.`
+          : "El lead ya está calificado: si confirma interés concreto, podés ofrecer agendar una visita.",
       );
 
       const messages = data.history
@@ -416,7 +467,9 @@ export const chatWithBot = createServerFn({ method: "POST" })
       // agendar_reunion, forzamos la consulta REAL a la agenda. Así nunca se
       // muestra un cierre con horarios inventados o sin turnos reales.
       const yaAgendo = actions.some((a) => a.type === "agendar_reunion");
-      if (!yaAgendo && text) {
+      // La red de seguridad NUNCA debe forzar turnos si el lead no está
+      // calificado: respeta el mismo gate que la tool agendar_reunion.
+      if (!yaAgendo && text && !faltanParaAgendar.length) {
         const t = norm(text);
         const ofreceCoordinar =
           /\b(agend|coordin)/.test(t) &&

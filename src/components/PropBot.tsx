@@ -65,6 +65,7 @@ function scoreProp(p: Property, lead: BotLeadState): number {
 }
 
 interface BotLeadState extends BotLead {
+  operacion?: string;
   zona?: string;
   tipo?: string;
   dormitorios?: number;
@@ -97,8 +98,9 @@ function calcPrioridad(lead: BotLeadState): string {
 function buildLeadRow(lead: BotLeadState, prop: Property): LeadRow {
   const intencion = lead.urgencia || lead.plazoCompra || "";
   const metodoPago = lead.financiamiento || "";
+  const operacion = lead.operacion || prop.operacion;
   const score = computeLeadScore({
-    operacion: prop.operacion,
+    operacion,
     zona: lead.zona,
     tipo: lead.tipo,
     presupuesto: lead.presupuesto,
@@ -119,12 +121,25 @@ function buildLeadRow(lead: BotLeadState, prop: Property): LeadRow {
     presupuesto: typeof lead.presupuesto === "number" ? lead.presupuesto : "",
     intencionCompra: intencion,
     metodoPago,
-    operacion: prop.operacion,
+    operacion,
     propiedadInteres: `${prop.tipo} en ${prop.barrio}, ${prop.departamento} (#${prop.id})`,
     matchEnCatalogo: score.matchEnCatalogo ? "Sí" : "No",
     puntaje: score.puntaje,
     prioridad: score.prioridad,
   };
+}
+
+// Indica si el lead tiene AL MENOS un dato de calificación propio (algo que el
+// usuario haya respondido). Si no hay ninguno, es una sesión de prueba o alguien
+// que se fue sin avanzar nada: no tiene sentido escribir la fila en la planilla.
+function tieneDatosCalificacion(lead: BotLeadState): boolean {
+  return Boolean(
+    lead.operacion ||
+      typeof lead.presupuesto === "number" ||
+      lead.urgencia ||
+      lead.plazoCompra ||
+      lead.financiamiento,
+  );
 }
 
 function PropertyCardBubble({ p }: { p: Property }) {
@@ -248,6 +263,7 @@ export function PropBot({
     const l = leadRef.current;
     return {
       nombre: l.nombre,
+      operacion: l.operacion,
       ubicacion: l.zona,
       tipo: l.tipo,
       urgencia: l.urgencia,
@@ -326,6 +342,7 @@ export function PropBot({
   // Aplica al perfil un patch de calificación y lo persiste (no bloquea).
   const applyPatch = useCallback(
     (patch: {
+      operacion?: string;
       financiamiento?: string;
       presupuesto?: number;
       urgencia?: string;
@@ -333,6 +350,10 @@ export function PropBot({
     }) => {
       const l = leadRef.current;
       let changed = false;
+      if (patch.operacion) {
+        l.operacion = patch.operacion;
+        changed = true;
+      }
       if (patch.financiamiento) {
         l.financiamiento = patch.financiamiento;
         changed = true;
@@ -369,6 +390,11 @@ export function PropBot({
   const registerLead = useCallback((opts?: { beacon?: boolean }) => {
     if (leadSentRef.current) return;
     if (!interactedRef.current) return; // no registramos a quien nunca interactuó
+    // No ensuciamos la planilla con filas vacías: si el lead no tiene ningún
+    // dato de calificación (ni operación, ni presupuesto, ni intención de compra,
+    // ni método de pago), es una sesión de prueba o alguien que se fue sin
+    // avanzar nada — no aporta nada al vendedor, así que no la escribimos.
+    if (!tieneDatosCalificacion(leadRef.current)) return;
     leadSentRef.current = true;
     if (inactivityTimerRef.current) {
       clearTimeout(inactivityTimerRef.current);
