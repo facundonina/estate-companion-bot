@@ -622,6 +622,7 @@ export function PropBot({
     if (!selectedSlot || slotConfirmed || confirming) return;
     const activeProp = activePropRef.current;
     setConfirming(true);
+    interactedRef.current = true;
     addMsg({
       role: "user",
       text: `Confirmo la visita para el ${selectedSlot.label} a las ${selectedSlot.time}`,
