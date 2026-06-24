@@ -454,44 +454,43 @@ export function PropBot({
   }, []);
 
   // Aplica al perfil un patch de calificación y lo persiste (no bloquea).
-  const applyPatch = useCallback(
-    (patch: {
-      operacion?: string;
-      financiamiento?: string;
-      presupuesto?: number;
-      urgencia?: string;
-      plazoCompra?: string;
-    }) => {
-      const l = leadRef.current;
-      let changed = false;
-      if (patch.operacion) {
-        l.operacion = patch.operacion;
-        changed = true;
-      }
-      if (patch.financiamiento) {
-        l.financiamiento = patch.financiamiento;
-        changed = true;
-      }
-      if (typeof patch.presupuesto === "number" && patch.presupuesto > 0) {
-        l.presupuesto = patch.presupuesto;
-        changed = true;
-      }
-      if (patch.urgencia) {
-        l.urgencia = patch.urgencia;
-        changed = true;
-      }
-      if (patch.plazoCompra) {
-        l.plazoCompra = patch.plazoCompra;
-        changed = true;
-      }
-      if (changed) {
-        l.prioridad = calcPrioridad(l);
-        mergeStoredLead({
-          urgencia: l.urgencia,
-          financiamiento: l.financiamiento,
-          presupuesto: l.presupuesto,
-          prioridad: l.prioridad,
-        });
+  const applyPatch = useCallback((patch: LeadPatch) => {
+    const l = leadRef.current;
+    let changed = false;
+    if (patch.operacion) {
+      l.operacion = patch.operacion;
+      changed = true;
+    }
+    if (patch.metodoPagoTexto) {
+      l.metodoPagoTexto = patch.metodoPagoTexto;
+      changed = true;
+    }
+    if (patch.metodoPagoCategoria) {
+      l.metodoPagoCategoria = patch.metodoPagoCategoria;
+      changed = true;
+    }
+    if (typeof patch.presupuesto === "number" && patch.presupuesto > 0) {
+      l.presupuesto = patch.presupuesto;
+      changed = true;
+    }
+    if (patch.intencionCompraTexto) {
+      l.intencionCompraTexto = patch.intencionCompraTexto;
+      changed = true;
+    }
+    if (patch.intencionCompraCategoria) {
+      l.intencionCompraCategoria = patch.intencionCompraCategoria;
+      changed = true;
+    }
+    if (changed) {
+      l.prioridad = calcPrioridad(l);
+      mergeStoredLead({
+        metodoPagoTexto: l.metodoPagoTexto,
+        metodoPagoCategoria: l.metodoPagoCategoria,
+        intencionCompraTexto: l.intencionCompraTexto,
+        intencionCompraCategoria: l.intencionCompraCategoria,
+        presupuesto: l.presupuesto,
+        prioridad: l.prioridad,
+      });
       }
     },
     [],
