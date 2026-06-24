@@ -713,7 +713,8 @@ export const interpretAnswer = createServerFn({ method: "POST" })
             operacion: z.string(),
             metodoPagoTexto: z.string(),
             metodoPagoCategoria: z.string(),
-            presupuesto: z.number(),
+            presupuesto: z.number().optional(),
+            presupuestoUSD: z.number().optional(),
             intencionCompraTexto: z.string(),
             intencionCompraCategoria: z.string(),
           }),
@@ -739,9 +740,10 @@ export const interpretAnswer = createServerFn({ method: "POST" })
         const s = str(v);
         return s && allowed.includes(s) ? s : null;
       };
+      const presupuestoRaw = output.presupuesto ?? output.presupuestoUSD;
       const num =
-        typeof output.presupuesto === "number" && output.presupuesto > 0
-          ? Math.round(output.presupuesto)
+        typeof presupuestoRaw === "number" && presupuestoRaw > 0
+          ? Math.round(presupuestoRaw)
           : null;
 
       return {
