@@ -8,12 +8,16 @@ import { SiteFooter } from "@/components/SiteFooter";
 interface PropSearch {
   q?: string;
   tipo?: string;
+  operacion?: string;
   departamento?: string;
   dormitorios?: number;
   precioMax?: number;
 }
 
 const tipos = Array.from(new Set(properties.map((p) => p.tipo)));
+const operaciones = Array.from(
+  new Set(properties.map((p) => p.operacion).filter(Boolean)),
+);
 const departamentos = Array.from(
   new Set(properties.map((p) => p.departamento)),
 ).sort();
