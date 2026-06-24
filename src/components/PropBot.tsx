@@ -440,7 +440,6 @@ export function PropBot({
       }
 
       const extra: Omit<BotMessage, "id" | "role" | "text"> = {};
-      let agendaShown = false;
 
       for (const a of result?.actions ?? []) {
         if (a.type === "actualizar_perfil_lead") {
@@ -457,20 +456,15 @@ export function PropBot({
           if (a.slots.length) {
             setAvailableSlots(a.slots);
             extra.agenda = true;
-            agendaShown = true;
           }
-        } else if (a.type === "registrar_lead") {
-          // El servidor ya calculó el puntaje y escribió la fila en el Sheet.
-          leadSentRef.current = true;
         }
       }
 
-      // Fallback: si el modelo ofreció agendar pero no llamó a registrar_lead,
-      // escribimos el lead desde el cliente (puntaje calculado por el sistema).
-      if (agendaShown && !leadSentRef.current) {
-        leadSentRef.current = true;
-        void sendLeadRow(buildLeadRow(leadRef.current, activePropRef.current));
-      }
+      // El lead NO se registra acá: se registra recién al final de la
+      // conversación (reunión confirmada o despedida) o como red de seguridad
+      // (inactividad / cierre de pestaña), para mandar siempre los datos más
+      // actualizados del perfil.
+
 
       const text =
         (result?.text || "").trim() ||
