@@ -554,7 +554,7 @@ export const chatWithBot = createServerFn({ method: "POST" })
         stopWhen: stepCountIs(8),
       });
 
-      const text = (result.text || "").trim();
+      const text = stripStructuredData((result.text || "").trim());
 
       // Red de seguridad: si el modelo escribió un cierre ofreciendo coordinar
       // o agendar una reunión/visita pero NO llamó a la herramienta
