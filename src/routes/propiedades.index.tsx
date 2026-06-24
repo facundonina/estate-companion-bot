@@ -116,6 +116,12 @@ function PropiedadesPage() {
             options={tipos}
           />
           <FilterSelect
+            value={search.operacion ?? ""}
+            onChange={(v) => update({ operacion: v || undefined })}
+            placeholder="Operación"
+            options={operaciones}
+          />
+          <FilterSelect
             value={search.departamento ?? ""}
             onChange={(v) => update({ departamento: v || undefined })}
             placeholder="Departamento"
