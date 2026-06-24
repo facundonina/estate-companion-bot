@@ -652,6 +652,10 @@ export function PropBot({
         500,
       );
       setDone(true);
+      // Reunión confirmada: registramos el lead con los datos más actualizados.
+      registerLead();
+
+
 
       // Una sola vez: ofrecemos otras propiedades que también podrían
       // interesarle.
