@@ -13,6 +13,8 @@ const SYSTEM_PROMPT = `Sos un asesor inmobiliario virtual en tono rioplatense, c
 Orden de calificación del lead:
 Para calificar al lead, seguí este orden de preguntas, una por vez, de forma conversacional y sin sonar a formulario: primero preguntá la zona de interés, después el rango de precio que está dispuesto a pagar, después si tiene urgencia o fecha en la que necesita mudarse, y por último cómo piensa financiar la compra (contado o crédito). No preguntes algo que el usuario ya respondió antes, aunque haya sido espontáneamente. Apenas detectes alguno de estos datos, guardalo con actualizar_perfil_lead.
 
+Plazo en meses (importante): cuando el usuario diga en cuánto tiempo planea comprar/mudarse, guardá el plazo SIEMPRE como un número entero de meses exacto en el campo plazoMeses de actualizar_perfil_lead. Convertí lo que diga a meses: "en 2 meses" -> 2, "en 8 meses" -> 8, "este año" o "en un año" -> 12, "en medio año" -> 6, "en una semana" o "ya" -> 1, "en 2 años" -> 24. Además seguí guardando el texto original en plazoCompra.
+
 Catálogo (importante):
 El catálogo real incluye propiedades en VENTA y en ALQUILER, en varios departamentos: Montevideo, Maldonado (Punta del Este, La Barra, José Ignacio, La Paloma, La Pedrera, Punta del Diablo, Aguas Dulces), Canelones (Ciudad de la Costa, Atlántida, Las Piedras), Colonia (Colonia del Sacramento, Carmelo, Nueva Palmira) y del interior (Salto, Paysandú, Rivera, Tacuarembó, Durazno). Hay apartamentos, casas, lotes y campos. Los precios de ALQUILER son mensuales (cifras bajas, cientos o pocos miles de USD por mes) y NO se comparan con los de VENTA (decenas o cientos de miles de USD). Detectá si el usuario quiere comprar o alquilar y pasá el parámetro 'operacion' ("Venta" o "Alquiler") a buscar_propiedades; si no queda claro, preguntalo. Nunca mezcles precios de venta con los de alquiler.
 
@@ -131,6 +133,7 @@ export type BotAction =
         presupuesto?: number;
         urgencia?: string;
         plazoCompra?: string;
+        plazoMeses?: number;
       };
     }
   | { type: "agendar_reunion"; slots: CalendarSlot[] };
@@ -148,6 +151,7 @@ const perfilSchema = z.object({
   financiamiento: z.string().max(120).optional(),
   presupuesto: z.number().optional(),
   plazoCompra: z.string().max(120).optional(),
+  plazoMeses: z.number().optional(),
 });
 
 const chatInputSchema = z.object({
@@ -294,7 +298,13 @@ export const chatWithBot = createServerFn({ method: "POST" })
             plazoCompra: z
               .string()
               .optional()
-              .describe("En cuánto tiempo planea comprar"),
+              .describe("En cuánto tiempo planea comprar (texto original)"),
+            plazoMeses: z
+              .number()
+              .optional()
+              .describe(
+                "Plazo de compra en NÚMERO ENTERO de meses exacto (ej: 'en 2 meses' -> 2, 'en 8 meses' -> 8, 'este año' -> 12, 'en 2 años' -> 24)",
+              ),
           }),
           execute: async (patch) => {
             const clean: {
@@ -302,12 +312,15 @@ export const chatWithBot = createServerFn({ method: "POST" })
               presupuesto?: number;
               urgencia?: string;
               plazoCompra?: string;
+              plazoMeses?: number;
             } = {};
             if (patch.financiacion) clean.financiamiento = patch.financiacion;
             if (typeof patch.presupuesto === "number" && patch.presupuesto > 0)
               clean.presupuesto = Math.round(patch.presupuesto);
             if (patch.urgencia) clean.urgencia = patch.urgencia;
             if (patch.plazoCompra) clean.plazoCompra = patch.plazoCompra;
+            if (typeof patch.plazoMeses === "number" && patch.plazoMeses > 0)
+              clean.plazoMeses = Math.round(patch.plazoMeses);
             actions.push({ type: "actualizar_perfil_lead", patch: clean });
             return { ok: true };
           },
@@ -361,6 +374,9 @@ export const chatWithBot = createServerFn({ method: "POST" })
           : null,
         p.urgencia ? `urgencia: ${p.urgencia}` : null,
         p.plazoCompra ? `plazo de compra: ${p.plazoCompra}` : null,
+        typeof p.plazoMeses === "number"
+          ? `plazo en meses: ${p.plazoMeses}`
+          : null,
       ].filter(Boolean);
       contextLines.push(
         perfilLines.length
@@ -485,6 +501,7 @@ export interface ProfilePatch {
   presupuesto: number | null;
   urgencia: string | null;
   plazoCompra: string | null;
+  plazoMeses: number | null;
 }
 
 const interpretInputSchema = z.object({
@@ -507,6 +524,7 @@ export const interpretAnswer = createServerFn({ method: "POST" })
       presupuesto: null,
       urgencia: null,
       plazoCompra: null,
+      plazoMeses: null,
     };
     try {
       const provider = await getProvider();
@@ -532,10 +550,11 @@ export const interpretAnswer = createServerFn({ method: "POST" })
             presupuesto: z.number(),
             urgencia: z.string(),
             plazoCompra: z.string(),
+            plazoMeses: z.number(),
           }),
         }),
         system:
-          "Sos un asistente de una inmobiliaria uruguaya. Extraé del último mensaje del usuario (usando el contexto) SOLO datos de calificación: financiación (cómo paga), presupuesto en USD, urgencia y plazo de compra. No inventes: si un dato no aparece, devolvé \"NONE\" para los textos y 0 para el presupuesto.",
+          "Sos un asistente de una inmobiliaria uruguaya. Extraé del último mensaje del usuario (usando el contexto) SOLO datos de calificación: financiación (cómo paga), presupuesto en USD, urgencia, plazo de compra (texto) y plazoMeses (el plazo convertido a un número ENTERO de meses exacto: 'en 2 meses' -> 2, 'en 8 meses' -> 8, 'este año' -> 12, 'en 2 años' -> 24, 'ya'/'urgente' -> 1). No inventes: si un dato no aparece, devolvé \"NONE\" para los textos y 0 para los números (presupuesto y plazoMeses).",
         messages: [
           ...historyMessages,
           {
@@ -553,12 +572,17 @@ export const interpretAnswer = createServerFn({ method: "POST" })
         typeof output.presupuesto === "number" && output.presupuesto > 0
           ? Math.round(output.presupuesto)
           : null;
+      const plazoMeses =
+        typeof output.plazoMeses === "number" && output.plazoMeses > 0
+          ? Math.round(output.plazoMeses)
+          : null;
 
       return {
         financiamiento: str(output.financiamiento),
         presupuesto: num,
         urgencia: str(output.urgencia),
         plazoCompra: str(output.plazoCompra),
+        plazoMeses,
       };
     } catch (err) {
       console.error("[botAi] Error interpretando respuesta:", err);
