@@ -281,10 +281,8 @@ export function PropBot({
       operacion: l.operacion,
       ubicacion: l.zona,
       tipo: l.tipo,
-      metodoPagoTexto: l.metodoPagoTexto,
-      metodoPagoCategoria: l.metodoPagoCategoria,
-      intencionCompraTexto: l.intencionCompraTexto,
-      intencionCompraCategoria: l.intencionCompraCategoria,
+      metodoPago: l.metodoPago,
+      intencionCompra: l.intencionCompra,
       presupuesto: l.presupuesto,
     };
   }, []);
