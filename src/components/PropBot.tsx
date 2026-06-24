@@ -595,6 +595,10 @@ export function PropBot({
       const propDesc = `${property.tipo} en ${property.barrio}, ${property.departamento} (${formatPrice(property.precio, property.moneda)})`;
       leadRef.current.zona = property.zona;
       leadRef.current.tipo = property.tipo;
+      // El usuario llegó a través de una propiedad puntual: la operación es la
+      // de esa propiedad (Venta o Alquiler). La completamos automáticamente y
+      // NO se la preguntamos.
+      leadRef.current.operacion = property.operacion;
 
       // Modo secundario: el usuario ya dejó sus datos y eligió ver otra
       // propiedad recomendada. No le pedimos el formulario de nuevo.
@@ -605,8 +609,8 @@ export function PropBot({
           {
             card: property,
             quickReplies: [
-              { label: "Sí, me interesa", value: "Sí" },
-              { label: "No, gracias", value: "No" },
+              { label: "Sí, me interesa", value: "Sí, me interesa esta propiedad" },
+              { label: "No, gracias", value: "No, gracias" },
             ],
           },
           650,
@@ -616,17 +620,18 @@ export function PropBot({
       }
 
       await botSay(
-        `Sos vos, el asesor inmobiliario, quien escribe este mensaje (no el usuario). Saludá a ${firstName(lead.nombre)} por su nombre, presentate en una frase como asesor y mencioná brevemente que se interesó en esta propiedad: ${propDesc}. Inmediatamente después arrancá con la PRIMERA pregunta de calificación del flujo: si está buscando comprar o alquilar. Es una sola pregunta, breve, en tono rioplatense. La tarjeta de la propiedad se muestra debajo de tu mensaje, no la repitas en texto.`,
-        `¡Hola ${firstName(lead.nombre)}! Soy tu asesor para esta propiedad. Para arrancar, contame: ¿la estás buscando para comprar o para alquilar?`,
+        `Sos vos, el asesor inmobiliario, quien escribe este mensaje (no el usuario). Saludá a ${firstName(lead.nombre)} por su nombre, presentate en una frase como asesor y mencioná brevemente que se interesó en esta propiedad: ${propDesc}. NO le preguntes si busca comprar o alquilar: ya sabemos que esta propiedad es en ${property.operacion}. Cerrá preguntándole de forma cálida y breve si le interesa avanzar con esta propiedad o si tiene alguna duda primero. La tarjeta de la propiedad se muestra debajo de tu mensaje, no la repitas en texto.`,
+        `¡Hola ${firstName(lead.nombre)}! Soy tu asesor para esta propiedad. ¿Te interesa avanzar con esta propiedad o tenés alguna duda primero?`,
         {
           card: property,
           quickReplies: [
-            { label: "Comprar", value: "Comprar" },
-            { label: "Alquilar", value: "Alquilar" },
+            { label: "Me interesa", value: "Me interesa esta propiedad" },
+            { label: "Tengo una duda", value: "Tengo una duda" },
           ],
         },
         650,
       );
+
 
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
