@@ -149,6 +149,7 @@ export interface ChatResult {
 
 const perfilSchema = z.object({
   nombre: z.string().max(120).optional(),
+  operacion: z.string().max(40).optional(),
   ubicacion: z.string().max(120).optional(),
   tipo: z.string().max(60).optional(),
   urgencia: z.string().max(120).optional(),
@@ -156,6 +157,21 @@ const perfilSchema = z.object({
   presupuesto: z.number().optional(),
   plazoCompra: z.string().max(120).optional(),
 });
+
+type PerfilLead = z.infer<typeof perfilSchema>;
+
+// Calificación mínima exigida ANTES de poder confirmar/ofrecer una visita.
+// Devuelve la lista de campos que faltan (vacía => se puede agendar).
+function camposFaltantesParaAgendar(perfil: PerfilLead): string[] {
+  const faltan: string[] = [];
+  if (!perfil.operacion) faltan.push("operación (compra o alquiler)");
+  if (typeof perfil.presupuesto !== "number" || perfil.presupuesto <= 0)
+    faltan.push("presupuesto");
+  if (!perfil.urgencia && !perfil.plazoCompra)
+    faltan.push("intención de compra o plazo de mudanza");
+  if (!perfil.financiamiento) faltan.push("método de pago");
+  return faltan;
+}
 
 const chatInputSchema = z.object({
   // Historial COMPLETO de la conversación (no solo el último mensaje).
