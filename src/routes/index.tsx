@@ -1,9 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Search, ArrowRight, MapPin, TrendingUp, Home, X } from "lucide-react";
-import { useState } from "react";
+import { Search, ArrowRight, MapPin, TrendingUp } from "lucide-react";
 import { properties } from "@/data/properties";
 import { PropertyCard } from "@/components/PropertyCard";
-import { SearchBot } from "@/components/SearchBot";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 
