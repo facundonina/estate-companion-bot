@@ -16,7 +16,12 @@ const STYLE_RULES = `Reglas de salida:
 - Sé breve: 1 a 3 frases como máximo.
 - Los precios siempre en dólares americanos (USD).
 - Mantené el tono rioplatense (vos, che, dale), cálido y profesional.
-- Cuando uses una herramienta que muestra tarjetas o una agenda, no repitas en texto toda la info: presentalas con una frase corta.`;
+- Cuando uses una herramienta que muestra tarjetas o una agenda, no repitas en texto toda la info: presentalas con una frase corta.
+
+Reglas de prioridad (importantes):
+- Si el usuario pide ver, mostrar, buscar o comparar propiedades, o menciona otra ubicación, precio o tipo, llamá buscar_propiedades AHORA y mostrale resultados reales ANTES de hacer cualquier pregunta de calificación. Primero respondé lo que pidió, después seguís calificando.
+- No condiciones mostrar propiedades a que primero responda urgencia, financiación o presupuesto. La calificación es secundaria y va apareciendo en la charla.
+- Si el usuario pregunta un dato puntual de la propiedad que está viendo, usá obtener_detalle_propiedad y respondé eso primero.`;
 
 // Crea el proveedor del gateway de Lovable AI (OpenAI-compatible).
 async function getProvider() {
