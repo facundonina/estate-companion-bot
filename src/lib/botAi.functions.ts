@@ -433,7 +433,7 @@ export const chatWithBot = createServerFn({ method: "POST" })
             // financiación. El lead se registra igual por el flujo normal de fin
             // de conversación, solo que sin generar un evento de calendario.
             if (
-              normalizeMetodoPagoCategoria(data.perfil.metodoPagoCategoria) ===
+              normalizeMetodoPagoCategoria(data.perfil.metodoPago) ===
               "Sin iniciar"
             ) {
               return {
