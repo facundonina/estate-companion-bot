@@ -88,12 +88,10 @@ interface BotLeadState extends BotLead {
   proposito?: string;
   piscina?: boolean;
   garage?: boolean;
-  // Método de pago: texto literal del usuario + categoría fija.
-  metodoPagoTexto?: string;
-  metodoPagoCategoria?: string;
-  // Intención de compra / plazo: texto literal del usuario + categoría fija.
-  intencionCompraTexto?: string;
-  intencionCompraCategoria?: string;
+  // Método de pago: una de las categorías fijas.
+  metodoPago?: string;
+  // Intención de compra / plazo: una de las categorías fijas.
+  intencionCompra?: string;
   prioridad?: string;
 }
 
@@ -103,8 +101,8 @@ function calcPrioridad(lead: BotLeadState): string {
     zona: lead.zona,
     tipo: lead.tipo,
     presupuesto: lead.presupuesto,
-    intencionCompraCategoria: lead.intencionCompraCategoria,
-    metodoPagoCategoria: lead.metodoPagoCategoria,
+    intencionCompra: lead.intencionCompra,
+    metodoPago: lead.metodoPago,
     nombre: lead.nombre,
     telefono: lead.telefono,
     email: lead.email,
@@ -112,22 +110,18 @@ function calcPrioridad(lead: BotLeadState): string {
 }
 
 // Construye la fila de la planilla de Leads. El puntaje y la prioridad SIEMPRE
-// los calcula el sistema (computeLeadScore) usando exclusivamente las CATEGORÍAS
-// fijas. En cambio, las columnas "Intención de compra" y "Método de pago" de la
-// planilla reciben el TEXTO LITERAL del usuario, no la categoría.
+// los calcula el sistema (computeLeadScore). Las columnas "Intención de compra"
+// y "Método de pago" reciben directamente la misma categoría fija (un solo
+// campo, sin texto literal separado ni transformación intermedia).
 function buildLeadRow(lead: BotLeadState, prop: Property): LeadRow {
-  const intencionTexto =
-    lead.intencionCompraTexto || lead.intencionCompraCategoria || "";
-  const metodoPagoTexto =
-    lead.metodoPagoTexto || lead.metodoPagoCategoria || "";
   const operacion = lead.operacion || prop.operacion;
   const score = computeLeadScore({
     operacion,
     zona: lead.zona,
     tipo: lead.tipo,
     presupuesto: lead.presupuesto,
-    intencionCompraCategoria: lead.intencionCompraCategoria,
-    metodoPagoCategoria: lead.metodoPagoCategoria,
+    intencionCompra: lead.intencionCompra,
+    metodoPago: lead.metodoPago,
     propiedadInteresId: prop.id,
     nombre: lead.nombre,
     telefono: lead.telefono,
@@ -141,8 +135,8 @@ function buildLeadRow(lead: BotLeadState, prop: Property): LeadRow {
     zona: lead.zona ?? "",
     tipo: lead.tipo ?? "",
     presupuesto: typeof lead.presupuesto === "number" ? lead.presupuesto : "",
-    intencionCompra: intencionTexto,
-    metodoPago: metodoPagoTexto,
+    intencionCompra: lead.intencionCompra ?? "",
+    metodoPago: lead.metodoPago ?? "",
     operacion,
     propiedadInteres: `${prop.tipo} en ${prop.barrio}, ${prop.departamento} (#${prop.id})`,
     matchEnCatalogo: score.matchEnCatalogo ? "Sí" : "No",
@@ -158,10 +152,8 @@ function tieneDatosCalificacion(lead: BotLeadState): boolean {
   return Boolean(
     lead.operacion ||
       typeof lead.presupuesto === "number" ||
-      lead.intencionCompraTexto ||
-      lead.intencionCompraCategoria ||
-      lead.metodoPagoTexto ||
-      lead.metodoPagoCategoria,
+      lead.intencionCompra ||
+      lead.metodoPago,
   );
 }
 
