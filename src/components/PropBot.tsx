@@ -550,10 +550,6 @@ export function PropBot({
           `¡Hola de nuevo, ${firstName(lead.nombre)}! Vimos que también te interesó esta propiedad. ¿Te gustaría avanzar por esta propiedad también?`,
           {
             card: property,
-            quickReplies: [
-              { label: "Sí, me interesa", value: "Sí, me interesa esta propiedad" },
-              { label: "No, gracias", value: "No, gracias" },
-            ],
           },
           650,
         );
