@@ -663,11 +663,13 @@ export const interpretAnswer = createServerFn({ method: "POST" })
           : null;
 
       return {
+        operacion: operacionDet ?? str(output.operacion),
         financiamiento: str(output.financiamiento),
         presupuesto: num,
         urgencia: str(output.urgencia),
         plazoCompra: str(output.plazoCompra),
       };
+
     } catch (err) {
       console.error("[botAi] Error interpretando respuesta:", err);
       return empty;
