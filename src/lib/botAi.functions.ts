@@ -196,11 +196,9 @@ export type BotAction =
       type: "actualizar_perfil_lead";
       patch: {
         operacion?: string;
-        metodoPagoTexto?: string;
-        metodoPagoCategoria?: string;
+        metodoPago?: string;
         presupuesto?: number;
-        intencionCompraTexto?: string;
-        intencionCompraCategoria?: string;
+        intencionCompra?: string;
       };
     }
   | { type: "agendar_reunion"; slots: CalendarSlot[] };
