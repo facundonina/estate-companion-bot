@@ -411,13 +411,17 @@ export function PropBot({
             extra.agenda = true;
             agendaShown = true;
           }
+        } else if (a.type === "registrar_lead") {
+          // El servidor ya calculó el puntaje y escribió la fila en el Sheet.
+          leadSentRef.current = true;
         }
       }
 
-      // Si el modelo ofreció agendar, el lead califica: lo enviamos al Sheet.
+      // Fallback: si el modelo ofreció agendar pero no llamó a registrar_lead,
+      // escribimos el lead desde el cliente (puntaje calculado por el sistema).
       if (agendaShown && !leadSentRef.current) {
         leadSentRef.current = true;
-        void sendLeadToSheet(leadPayload(leadRef.current, activePropRef.current));
+        void sendLeadRow(buildLeadRow(leadRef.current, activePropRef.current));
       }
 
       const text =
