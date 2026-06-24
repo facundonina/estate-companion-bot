@@ -845,20 +845,6 @@ export function PropBot({
                   </button>
                 </div>
               )}
-              {m.quickReplies && !typing && m === messages[messages.length - 1] && (
-                <div className="flex flex-wrap gap-1.5">
-                  {m.quickReplies.map((qr) => (
-                    <button
-                      key={qr.value}
-                      type="button"
-                      onClick={() => handleQuickReply(qr)}
-                      className="rounded-full border border-border bg-card px-3 py-1.5 text-[12px] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                    >
-                      {qr.label}
-                    </button>
-                  ))}
-                </div>
-              )}
             </div>
           </div>
         ))}
