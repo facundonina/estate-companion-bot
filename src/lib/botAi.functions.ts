@@ -291,7 +291,7 @@ export const chatWithBot = createServerFn({ method: "POST" })
         // -------------------------------------------------------------------
         agendar_reunion: tool({
           description:
-            "Ofrece turnos disponibles con un vendedor para coordinar una reunión/visita. Usala SOLO cuando el perfil del lead esté suficientemente calificado (al menos financiación y urgencia/plazo claros). Devuelve horarios reales de la agenda.",
+            "Consulta la agenda REAL del vendedor y devuelve los turnos disponibles para coordinar una reunión/visita. Es la ÚNICA forma válida de ofrecer horarios: nunca escribas horarios o disponibilidad por tu cuenta. Usala SOLO cuando el usuario ya confirmó interés concreto en una propiedad puntual mostrada por buscar_propiedades.",
           inputSchema: z.object({}),
           execute: async () => {
             try {
