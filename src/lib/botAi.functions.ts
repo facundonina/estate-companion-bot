@@ -637,7 +637,7 @@ export const generateBotMessage = createServerFn({ method: "POST" })
         messages,
       });
 
-      const clean = (text || "").trim();
+      const clean = stripStructuredData((text || "").trim());
       return { text: clean || null };
     } catch (err) {
       console.error("[botAi] Error generando mensaje:", err);
