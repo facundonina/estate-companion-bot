@@ -71,17 +71,26 @@ function detectQuickReplies(text: string): QuickReply[] | undefined {
       {
         label: "Contado",
         value: "Lo pago al contado",
-        patch: { financiamiento: "Efectivo listo" },
+        patch: {
+          metodoPagoTexto: "Lo pago al contado",
+          metodoPagoCategoria: "Efectivo listo",
+        },
       },
       {
         label: "Crédito ya aprobado",
         value: "Con crédito ya aprobado",
-        patch: { financiamiento: "Crédito hipotecario aprobado" },
+        patch: {
+          metodoPagoTexto: "Con crédito ya aprobado",
+          metodoPagoCategoria: "Crédito hipotecario aprobado",
+        },
       },
       {
         label: "Crédito en trámite",
         value: "Con crédito en trámite",
-        patch: { financiamiento: "Crédito en trámite" },
+        patch: {
+          metodoPagoTexto: "Con crédito en trámite",
+          metodoPagoCategoria: "Crédito en trámite",
+        },
       },
     ];
   }
@@ -97,17 +106,26 @@ function detectQuickReplies(text: string): QuickReply[] | undefined {
       {
         label: "Ya",
         value: "La necesito ya",
-        patch: { urgencia: "Menos de 3 meses" },
+        patch: {
+          intencionCompraTexto: "La necesito ya",
+          intencionCompraCategoria: "Menos de 3 meses",
+        },
       },
       {
         label: "En los próximos meses",
         value: "En los próximos meses",
-        patch: { urgencia: "3 a 6 meses" },
+        patch: {
+          intencionCompraTexto: "En los próximos meses",
+          intencionCompraCategoria: "3 a 6 meses",
+        },
       },
       {
         label: "Más adelante",
         value: "Más adelante",
-        patch: { urgencia: "Más adelante" },
+        patch: {
+          intencionCompraTexto: "Más adelante",
+          intencionCompraCategoria: "En el año",
+        },
       },
     ];
   }
