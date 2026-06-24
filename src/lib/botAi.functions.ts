@@ -213,12 +213,10 @@ const perfilSchema = z.object({
   operacion: z.string().max(40).optional(),
   ubicacion: z.string().max(120).optional(),
   tipo: z.string().max(60).optional(),
-  // Método de pago: texto literal del usuario + categoría fija.
-  metodoPagoTexto: z.string().max(200).optional(),
-  metodoPagoCategoria: z.string().max(60).optional(),
-  // Intención de compra / plazo: texto literal del usuario + categoría fija.
-  intencionCompraTexto: z.string().max(200).optional(),
-  intencionCompraCategoria: z.string().max(60).optional(),
+  // Método de pago: una de las categorías fijas (sin texto literal separado).
+  metodoPago: z.string().max(60).optional(),
+  // Intención de compra / plazo: una de las categorías fijas.
+  intencionCompra: z.string().max(60).optional(),
   presupuesto: z.number().optional(),
 });
 
@@ -228,18 +226,13 @@ type PerfilLead = z.infer<typeof perfilSchema>;
 // Devuelve la lista de campos que faltan (vacía => se puede agendar).
 function camposFaltantesParaAgendar(perfil: PerfilLead): string[] {
   const faltan: string[] = [];
-  const metodoPagoCategoria = normalizeMetodoPagoCategoria(
-    perfil.metodoPagoCategoria,
-  );
+  const metodoPago = normalizeMetodoPagoCategoria(perfil.metodoPago);
   if (!perfil.operacion) faltan.push("operación (compra o alquiler)");
   if (typeof perfil.presupuesto !== "number" || perfil.presupuesto <= 0)
     faltan.push("presupuesto");
-  if (
-    !perfil.intencionCompraCategoria ||
-    perfil.intencionCompraCategoria === "Sin definir"
-  )
+  if (!perfil.intencionCompra || perfil.intencionCompra === "Sin definir")
     faltan.push("intención de compra o plazo de mudanza");
-  if (!metodoPagoCategoria || metodoPagoCategoria === "Sin iniciar")
+  if (!metodoPago || metodoPago === "Sin iniciar")
     faltan.push("método de pago");
   return faltan;
 }
