@@ -8,12 +8,16 @@ import { SiteFooter } from "@/components/SiteFooter";
 interface PropSearch {
   q?: string;
   tipo?: string;
+  operacion?: string;
   departamento?: string;
   dormitorios?: number;
   precioMax?: number;
 }
 
 const tipos = Array.from(new Set(properties.map((p) => p.tipo)));
+const operaciones = Array.from(
+  new Set(properties.map((p) => p.operacion).filter(Boolean)),
+);
 const departamentos = Array.from(
   new Set(properties.map((p) => p.departamento)),
 ).sort();
@@ -22,6 +26,8 @@ export const Route = createFileRoute("/propiedades/")({
   validateSearch: (search: Record<string, unknown>): PropSearch => ({
     q: typeof search.q === "string" ? search.q : undefined,
     tipo: typeof search.tipo === "string" ? search.tipo : undefined,
+    operacion:
+      typeof search.operacion === "string" ? search.operacion : undefined,
     departamento:
       typeof search.departamento === "string" ? search.departamento : undefined,
     dormitorios: search.dormitorios ? Number(search.dormitorios) : undefined,
@@ -54,6 +60,7 @@ function PropiedadesPage() {
 
   const filtered = properties.filter((p) => {
     if (search.tipo && p.tipo !== search.tipo) return false;
+    if (search.operacion && p.operacion !== search.operacion) return false;
     if (search.departamento && p.departamento !== search.departamento)
       return false;
     if (search.dormitorios && p.dormitorios < search.dormitorios) return false;
@@ -66,7 +73,7 @@ function PropiedadesPage() {
   });
 
   const hasFilters =
-    search.q || search.tipo || search.departamento || search.dormitorios || search.precioMax;
+    search.q || search.tipo || search.operacion || search.departamento || search.dormitorios || search.precioMax;
 
   return (
     <div className="min-h-screen bg-background">
@@ -107,6 +114,12 @@ function PropiedadesPage() {
             onChange={(v) => update({ tipo: v || undefined })}
             placeholder="Tipo"
             options={tipos}
+          />
+          <FilterSelect
+            value={search.operacion ?? ""}
+            onChange={(v) => update({ operacion: v || undefined })}
+            placeholder="Operación"
+            options={operaciones}
           />
           <FilterSelect
             value={search.departamento ?? ""}

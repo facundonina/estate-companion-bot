@@ -22,6 +22,11 @@ export function PropertyCard({ property }: { property: Property }) {
         <span className="absolute left-3 top-3 rounded-full bg-background/90 px-3 py-1 text-xs font-semibold text-foreground backdrop-blur">
           {property.tipo}
         </span>
+        {property.operacion && (
+          <span className="absolute left-3 bottom-3 rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground">
+            {property.operacion}
+          </span>
+        )}
         {property.estado === "Nuevo" && (
           <span className="absolute right-3 top-3 rounded-full bg-gold px-3 py-1 text-xs font-semibold text-gold-foreground">
             Estreno
@@ -32,6 +37,9 @@ export function PropertyCard({ property }: { property: Property }) {
       <div className="flex flex-1 flex-col p-5">
         <p className="font-serif text-xl font-semibold text-primary">
           {formatPrice(property.precio, property.moneda)}
+          {property.operacion === "Alquiler" && (
+            <span className="text-sm font-normal text-muted-foreground">/mes</span>
+          )}
         </p>
         <h3 className="mt-1 line-clamp-1 text-base font-semibold text-foreground">
           {propertyTitle(property.tipo, property.barrio, property.dormitorios)}
