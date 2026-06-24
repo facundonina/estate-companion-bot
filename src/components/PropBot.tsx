@@ -462,11 +462,8 @@ export function PropBot({
       );
       await new Promise((r) => setTimeout(r, 300));
       await botSay(
-        "Decile que, antes de coordinar la visita, te gustaría conocer un par de cosas para asegurarte de que sea la mejor opción para él/ella. Después hacé UNA sola pregunta: con qué urgencia o para cuándo necesita concretar la compra.",
-        "Genial. Antes de coordinar la visita, me gustaría conocer un par de cosas para asegurarme de que sea la mejor opción para vos. ¿Cuándo necesitás concretar la compra?",
-        {
-          quickReplies: URGENCIA_OPCIONES.map((o) => ({ label: o, value: o })),
-        },
+        "Invitá al usuario, de forma abierta y cálida, a contarte qué está buscando o a preguntarte lo que quiera sobre la propiedad. No le des opciones cerradas ni hagas una pregunta de calificación todavía; dejá que lleve la conversación.",
+        "Contame, ¿qué te gustaría saber o qué estás buscando? Estoy para ayudarte con lo que necesites.",
       );
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
