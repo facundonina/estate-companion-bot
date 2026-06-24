@@ -13,8 +13,6 @@ const SYSTEM_PROMPT = `Sos un asesor inmobiliario virtual en tono rioplatense, c
 Orden de calificación del lead:
 Para calificar al lead, seguí este orden de preguntas, una por vez, de forma conversacional y sin sonar a formulario: primero preguntá la zona de interés, después el rango de precio que está dispuesto a pagar, después si tiene urgencia o fecha en la que necesita mudarse, y por último cómo piensa financiar la compra (contado o crédito). No preguntes algo que el usuario ya respondió antes, aunque haya sido espontáneamente. Apenas detectes alguno de estos datos, guardalo con actualizar_perfil_lead.
 
-Plazo en meses (importante): cuando el usuario diga en cuánto tiempo planea comprar/mudarse, guardá el plazo SIEMPRE como un número entero de meses exacto en el campo plazoMeses de actualizar_perfil_lead. Convertí lo que diga a meses: "en 2 meses" -> 2, "en 8 meses" -> 8, "este año" o "en un año" -> 12, "en medio año" -> 6, "en una semana" o "ya" -> 1, "en 2 años" -> 24. Además seguí guardando el texto original en plazoCompra.
-
 Catálogo (importante):
 El catálogo real incluye propiedades en VENTA y en ALQUILER, en varios departamentos: Montevideo, Maldonado (Punta del Este, La Barra, José Ignacio, La Paloma, La Pedrera, Punta del Diablo, Aguas Dulces), Canelones (Ciudad de la Costa, Atlántida, Las Piedras), Colonia (Colonia del Sacramento, Carmelo, Nueva Palmira) y del interior (Salto, Paysandú, Rivera, Tacuarembó, Durazno). Hay apartamentos, casas, lotes y campos. Los precios de ALQUILER son mensuales (cifras bajas, cientos o pocos miles de USD por mes) y NO se comparan con los de VENTA (decenas o cientos de miles de USD). Detectá si el usuario quiere comprar o alquilar y pasá el parámetro 'operacion' ("Venta" o "Alquiler") a buscar_propiedades; si no queda claro, preguntalo. Nunca mezcles precios de venta con los de alquiler.
 
@@ -34,20 +32,8 @@ Cuando el usuario pida una zona específica con un presupuesto, primero buscá e
 Nunca inventes datos:
 Nunca inventes propiedades, precios, fechas de entrega, condiciones de financiación, ni datos de contacto que no vengan de buscar_propiedades, obtener_detalle_propiedad, o de la información que el propio usuario te dio en la charla. Si no tenés un dato (por ejemplo, la fecha de entrega exacta de una propiedad), decilo explícitamente en vez de inventarlo o responder con una frase genérica.
 
-Calificación obligatoria por interés concreto (importante):
-Cuando el usuario muestre interés CONCRETO en una propiedad puntual ya mostrada por buscar_propiedades (dice que le gusta, pregunta detalles específicos, pide más info de esa propiedad, o quiere agendar una visita), antes de continuar tenés que hacer OBLIGATORIAMENTE estas 3 preguntas de calificación, una por vez, de forma conversacional:
-1. ¿Cómo pensás financiar la compra? (Efectivo listo / Crédito aprobado / Crédito en trámite / Sin definir todavía)
-2. ¿En cuántos meses aproximadamente pensás concretar la compra? (pedile que responda con un número)
-3. Confirmá el presupuesto aproximado que maneja.
-Reglas estrictas de esta calificación:
-- Si el usuario evade o cambia de tema sin responder una de estas 3 preguntas, redirigilo UNA vez más con un mensaje amable, volviendo a pedir el dato que falta.
-- Si evade por SEGUNDA vez consecutiva, decile amablemente que para poder ayudarlo necesitás esa información, que cuando esté listo puede volver, y cerrá la conversación sin insistir más.
-- NUNCA avances a mostrar horarios de visita (agendar_reunion) ni confirmes nada sin tener los 3 datos completos.
-- Cuando el usuario responda las 3 preguntas, guardá con actualizar_perfil_lead: financiacion, plazoMeses (número entero exacto de meses) y presupuesto, ANTES de continuar.
-- Estas 3 preguntas NO se hacen si el usuario está simplemente explorando o buscando propiedades; solo se activan cuando muestra interés concreto en una propiedad puntual.
-
 Agendar reunión:
-Solo ofrecé agendar_reunion una vez que el usuario haya confirmado interés concreto en una propiedad puntual mostrada por buscar_propiedades Y haya respondido las 3 preguntas de calificación obligatoria (financiación, plazo en meses y presupuesto). Para ofrecer horarios SIEMPRE tenés que llamar a la herramienta agendar_reunion: ella consulta la agenda real y devuelve los turnos disponibles. Nunca escribas vos mismo horarios, fechas ni disponibilidad; si no llamaste a la herramienta, no menciones ni ofrezcas horarios concretos.`;
+Solo ofrecé agendar_reunion una vez que el usuario haya confirmado interés concreto en una propiedad puntual mostrada por buscar_propiedades, no apenas haya respondido las preguntas de calificación. Para ofrecer horarios SIEMPRE tenés que llamar a la herramienta agendar_reunion: ella consulta la agenda real y devuelve los turnos disponibles. Nunca escribas vos mismo horarios, fechas ni disponibilidad; si no llamaste a la herramienta, no menciones ni ofrezcas horarios concretos.`;
 
 // Reglas de salida para la burbuja de chat.
 const STYLE_RULES = `Reglas de salida:
@@ -145,7 +131,6 @@ export type BotAction =
         presupuesto?: number;
         urgencia?: string;
         plazoCompra?: string;
-        plazoMeses?: number;
       };
     }
   | { type: "agendar_reunion"; slots: CalendarSlot[] };
@@ -163,7 +148,6 @@ const perfilSchema = z.object({
   financiamiento: z.string().max(120).optional(),
   presupuesto: z.number().optional(),
   plazoCompra: z.string().max(120).optional(),
-  plazoMeses: z.number().optional(),
 });
 
 const chatInputSchema = z.object({
@@ -310,13 +294,7 @@ export const chatWithBot = createServerFn({ method: "POST" })
             plazoCompra: z
               .string()
               .optional()
-              .describe("En cuánto tiempo planea comprar (texto original)"),
-            plazoMeses: z
-              .number()
-              .optional()
-              .describe(
-                "Plazo de compra en NÚMERO ENTERO de meses exacto (ej: 'en 2 meses' -> 2, 'en 8 meses' -> 8, 'este año' -> 12, 'en 2 años' -> 24)",
-              ),
+              .describe("En cuánto tiempo planea comprar"),
           }),
           execute: async (patch) => {
             const clean: {
@@ -324,15 +302,12 @@ export const chatWithBot = createServerFn({ method: "POST" })
               presupuesto?: number;
               urgencia?: string;
               plazoCompra?: string;
-              plazoMeses?: number;
             } = {};
             if (patch.financiacion) clean.financiamiento = patch.financiacion;
             if (typeof patch.presupuesto === "number" && patch.presupuesto > 0)
               clean.presupuesto = Math.round(patch.presupuesto);
             if (patch.urgencia) clean.urgencia = patch.urgencia;
             if (patch.plazoCompra) clean.plazoCompra = patch.plazoCompra;
-            if (typeof patch.plazoMeses === "number" && patch.plazoMeses > 0)
-              clean.plazoMeses = Math.round(patch.plazoMeses);
             actions.push({ type: "actualizar_perfil_lead", patch: clean });
             return { ok: true };
           },
@@ -386,9 +361,6 @@ export const chatWithBot = createServerFn({ method: "POST" })
           : null,
         p.urgencia ? `urgencia: ${p.urgencia}` : null,
         p.plazoCompra ? `plazo de compra: ${p.plazoCompra}` : null,
-        typeof p.plazoMeses === "number"
-          ? `plazo en meses: ${p.plazoMeses}`
-          : null,
       ].filter(Boolean);
       contextLines.push(
         perfilLines.length
@@ -513,7 +485,6 @@ export interface ProfilePatch {
   presupuesto: number | null;
   urgencia: string | null;
   plazoCompra: string | null;
-  plazoMeses: number | null;
 }
 
 const interpretInputSchema = z.object({
@@ -536,7 +507,6 @@ export const interpretAnswer = createServerFn({ method: "POST" })
       presupuesto: null,
       urgencia: null,
       plazoCompra: null,
-      plazoMeses: null,
     };
     try {
       const provider = await getProvider();
@@ -562,11 +532,10 @@ export const interpretAnswer = createServerFn({ method: "POST" })
             presupuesto: z.number(),
             urgencia: z.string(),
             plazoCompra: z.string(),
-            plazoMeses: z.number(),
           }),
         }),
         system:
-          "Sos un asistente de una inmobiliaria uruguaya. Extraé del último mensaje del usuario (usando el contexto) SOLO datos de calificación: financiación (cómo paga), presupuesto en USD, urgencia, plazo de compra (texto) y plazoMeses (el plazo convertido a un número ENTERO de meses exacto: 'en 2 meses' -> 2, 'en 8 meses' -> 8, 'este año' -> 12, 'en 2 años' -> 24, 'ya'/'urgente' -> 1). No inventes: si un dato no aparece, devolvé \"NONE\" para los textos y 0 para los números (presupuesto y plazoMeses).",
+          "Sos un asistente de una inmobiliaria uruguaya. Extraé del último mensaje del usuario (usando el contexto) SOLO datos de calificación: financiación (cómo paga), presupuesto en USD, urgencia y plazo de compra. No inventes: si un dato no aparece, devolvé \"NONE\" para los textos y 0 para el presupuesto.",
         messages: [
           ...historyMessages,
           {
@@ -584,17 +553,12 @@ export const interpretAnswer = createServerFn({ method: "POST" })
         typeof output.presupuesto === "number" && output.presupuesto > 0
           ? Math.round(output.presupuesto)
           : null;
-      const plazoMeses =
-        typeof output.plazoMeses === "number" && output.plazoMeses > 0
-          ? Math.round(output.plazoMeses)
-          : null;
 
       return {
         financiamiento: str(output.financiamiento),
         presupuesto: num,
         urgencia: str(output.urgencia),
         plazoCompra: str(output.plazoCompra),
-        plazoMeses,
       };
     } catch (err) {
       console.error("[botAi] Error interpretando respuesta:", err);
