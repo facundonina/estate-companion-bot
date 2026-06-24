@@ -100,7 +100,7 @@ function buildLeadRow(lead: BotLeadState, prop: Property): LeadRow {
   const metodoPago = lead.financiamiento || "";
   const operacion = lead.operacion || prop.operacion;
   const score = computeLeadScore({
-    operacion: prop.operacion,
+    operacion,
     zona: lead.zona,
     tipo: lead.tipo,
     presupuesto: lead.presupuesto,
@@ -121,7 +121,7 @@ function buildLeadRow(lead: BotLeadState, prop: Property): LeadRow {
     presupuesto: typeof lead.presupuesto === "number" ? lead.presupuesto : "",
     intencionCompra: intencion,
     metodoPago,
-    operacion: prop.operacion,
+    operacion,
     propiedadInteres: `${prop.tipo} en ${prop.barrio}, ${prop.departamento} (#${prop.id})`,
     matchEnCatalogo: score.matchEnCatalogo ? "Sí" : "No",
     puntaje: score.puntaje,
