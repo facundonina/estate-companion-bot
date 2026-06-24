@@ -90,9 +90,10 @@ function propDetalle(p: Property) {
   return {
     id: p.id,
     tipo: p.tipo,
+    operacion: p.operacion,
     ubicacion: `${p.barrio}, ${p.departamento}`,
     zona: p.zona,
-    precio: formatPrice(p.precio, p.moneda),
+    precio: formatPrice(p.precio, p.moneda) + (p.operacion === "Alquiler" ? "/mes" : ""),
     moneda: p.moneda,
     dormitorios: p.dormitorios,
     banos: p.banos,
