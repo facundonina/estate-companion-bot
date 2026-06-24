@@ -159,8 +159,8 @@ export function computeLeadScore(
     return { puntaje: 0, prioridad: "Baja", matchEnCatalogo: match, esVenta };
   }
 
-  const pIntencion = puntosIntencion(perfil.intencionCompra);
-  const pPago = puntosMetodoPago(perfil.metodoPago);
+  const pIntencion = puntosIntencion(perfil.intencionCompraCategoria);
+  const pPago = puntosMetodoPago(perfil.metodoPagoCategoria);
   const pMatch = match ? 2 : 0;
 
   // Completitud: teléfono + email válidos y presupuesto/intención/pago
