@@ -685,11 +685,9 @@ export const interpretAnswer = createServerFn({ method: "POST" })
     const operacionDet = mapOperacion(data.message);
     const empty: ProfilePatch = {
       operacion: operacionDet,
-      metodoPagoTexto: null,
-      metodoPagoCategoria: null,
+      metodoPago: null,
       presupuesto: null,
-      intencionCompraTexto: null,
-      intencionCompraCategoria: null,
+      intencionCompra: null,
     };
 
     try {
