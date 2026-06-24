@@ -636,6 +636,7 @@ export const interpretAnswer = createServerFn({ method: "POST" })
         model,
         output: Output.object({
           schema: z.object({
+            operacion: z.string(),
             financiamiento: z.string(),
             presupuesto: z.number(),
             urgencia: z.string(),
@@ -643,7 +644,7 @@ export const interpretAnswer = createServerFn({ method: "POST" })
           }),
         }),
         system:
-          "Sos un asistente de una inmobiliaria uruguaya. Extraé del último mensaje del usuario (usando el contexto) SOLO datos de calificación: financiación (cómo paga), presupuesto en USD, urgencia y plazo de compra. No inventes: si un dato no aparece, devolvé \"NONE\" para los textos y 0 para el presupuesto.",
+          "Sos un asistente de una inmobiliaria uruguaya. Extraé del último mensaje del usuario (usando el contexto) SOLO datos de calificación: operación (devolvé \"Venta\" si quiere comprar -comprar, comprarla, compra-, \"Alquiler\" si quiere alquilar -alquilar, rentar, alquilarla-), financiación (cómo paga), presupuesto en USD, urgencia y plazo de compra. No inventes: si un dato no aparece, devolvé \"NONE\" para los textos y 0 para el presupuesto.",
         messages: [
           ...historyMessages,
           {
@@ -651,6 +652,7 @@ export const interpretAnswer = createServerFn({ method: "POST" })
             content: `Último mensaje del usuario: "${data.message}"`,
           },
         ],
+
       });
 
       const str = (v: unknown) => {
