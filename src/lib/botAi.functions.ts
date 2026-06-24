@@ -83,6 +83,27 @@ function norm(s: string): string {
     .trim();
 }
 
+// Mapea la respuesta del usuario sobre la operación a "Venta" o "Alquiler",
+// reconociendo sinónimos comunes (comprar/compra -> Venta; alquilar/rentar ->
+// Alquiler), no solo las palabras exactas "venta"/"alquiler".
+export function mapOperacion(text: string): "Venta" | "Alquiler" | null {
+  const n = norm(text);
+  if (
+    /\b(comprar|comprarla|comprarlo|comprarlos|comprarme|comprando|compra|compro|adquirir|adquirirla|venta|vender)\b/.test(
+      n,
+    )
+  )
+    return "Venta";
+  if (
+    /\b(alquilar|alquilarla|alquilarlo|alquilando|alquiler|alquilo|rentar|rentarla|rentarlo|renta|arrendar|arriendo)\b/.test(
+      n,
+    )
+  )
+    return "Alquiler";
+  return null;
+}
+
+
 // Resumen compacto de una propiedad para devolverle al modelo / al cliente.
 function propSummary(p: Property) {
   return {
