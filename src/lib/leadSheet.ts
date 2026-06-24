@@ -17,6 +17,12 @@ export interface LeadSheetPayload {
   proposito?: string;
   urgencia?: string;
   financiamiento?: string;
+  /** Plazo de compra en número de meses (exacto). */
+  plazoMeses?: number;
+  /** Precio real de la propiedad de interés (USD). */
+  precio?: number;
+  /** Puntaje numérico calculado del lead. */
+  puntaje?: number;
   prioridad?: string;
   /** Propiedad puntual que está consultando el lead. */
   propiedad?: string;
