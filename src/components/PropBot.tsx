@@ -46,14 +46,7 @@ function firstName(n: string) {
   return (n || "").split(" ")[0] || "";
 }
 
-// Opciones que ofrecemos como botones en el saludo inicial (atajos). El modelo
-// ya no depende de ellas: interpreta cualquier respuesta en texto libre.
-const URGENCIA_OPCIONES = [
-  "Menos de 3 meses",
-  "3 a 6 meses",
-  "En el año",
-  "Estoy explorando",
-];
+
 
 function scoreProp(p: Property, lead: BotLeadState): number {
   let s = 0;
