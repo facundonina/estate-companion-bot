@@ -133,6 +133,7 @@ export type BotAction =
         presupuesto?: number;
         urgencia?: string;
         plazoCompra?: string;
+        plazoMeses?: number;
       };
     }
   | { type: "agendar_reunion"; slots: CalendarSlot[] };
