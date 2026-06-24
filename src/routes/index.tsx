@@ -135,23 +135,6 @@ function Index() {
       </section>
 
       <SiteFooter />
-
-      {/* Floating Chat */}
-      {chatOpen && (
-        <div className="fixed bottom-20 right-4 z-50 w-[360px] max-w-[calc(100vw-2rem)] shadow-2xl sm:right-6">
-          <SearchBot />
-        </div>
-      )}
-
-      {/* FAB */}
-      <button
-        type="button"
-        onClick={() => setChatOpen((v) => !v)}
-        aria-label={chatOpen ? "Cerrar chat" : "Abrir chat"}
-        className="fixed bottom-4 right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-elevated transition-transform hover:scale-105 active:scale-95 sm:bottom-6 sm:right-6"
-      >
-        {chatOpen ? <X size={22} /> : <Home size={22} />}
-      </button>
     </div>
   );
 }
