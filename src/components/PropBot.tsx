@@ -663,16 +663,7 @@ export function PropBot({
     [addMsg, botReply, done, runBot, typing, bumpInactivity, registerLead],
   );
 
-  // Click en un botón de respuesta rápida: si el botón trae un patch de perfil
-  // (financiación/plazo), lo aplicamos directo para no depender de interpretar
-  // texto libre, y mandamos el valor como mensaje del usuario.
-  const handleQuickReply = useCallback(
-    (qr: QuickReply) => {
-      if (qr.patch) applyPatch(qr.patch);
-      void handleSend(qr.value);
-    },
-    [applyPatch, handleSend],
-  );
+
 
 
 
