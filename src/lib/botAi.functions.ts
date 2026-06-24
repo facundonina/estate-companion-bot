@@ -501,6 +501,7 @@ export interface ProfilePatch {
   presupuesto: number | null;
   urgencia: string | null;
   plazoCompra: string | null;
+  plazoMeses: number | null;
 }
 
 const interpretInputSchema = z.object({
