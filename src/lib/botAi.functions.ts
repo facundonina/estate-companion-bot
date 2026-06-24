@@ -134,6 +134,7 @@ export type BotAction =
   | {
       type: "actualizar_perfil_lead";
       patch: {
+        operacion?: string;
         financiamiento?: string;
         presupuesto?: number;
         urgencia?: string;
