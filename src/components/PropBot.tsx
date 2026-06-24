@@ -129,6 +129,19 @@ function buildLeadRow(lead: BotLeadState, prop: Property): LeadRow {
   };
 }
 
+// Indica si el lead tiene AL MENOS un dato de calificación propio (algo que el
+// usuario haya respondido). Si no hay ninguno, es una sesión de prueba o alguien
+// que se fue sin avanzar nada: no tiene sentido escribir la fila en la planilla.
+function tieneDatosCalificacion(lead: BotLeadState): boolean {
+  return Boolean(
+    lead.operacion ||
+      typeof lead.presupuesto === "number" ||
+      lead.urgencia ||
+      lead.plazoCompra ||
+      lead.financiamiento,
+  );
+}
+
 function PropertyCardBubble({ p }: { p: Property }) {
   const isLand = p.tipo === "Lote" || p.tipo === "Campo";
   return (
