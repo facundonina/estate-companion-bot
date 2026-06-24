@@ -528,6 +528,25 @@ export function PropBot({
       if (!text || typing) return;
       addMsg({ role: "user", text });
       setInput("");
+      // El usuario interactuó: habilita el registro y reinicia el temporizador
+      // de inactividad (red de seguridad).
+      interactedRef.current = true;
+      bumpInactivity();
+
+      // Despedida explícita: cerramos la conversación y registramos el lead con
+      // los datos más actualizados.
+      if (isFarewell(text)) {
+        await botReply(
+          {
+            text: "¡Gracias por tu tiempo! Cualquier cosa estoy por acá. ¡Que andes bien! 👋",
+          },
+          600,
+        );
+        registerLead();
+        setDone(true);
+        return;
+      }
+
 
       // Modo secundario: confirmación de avanzar por esta propiedad.
       if (secondaryConfirmRef.current) {
