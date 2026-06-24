@@ -565,7 +565,7 @@ export const chatWithBot = createServerFn({ method: "POST" })
       // es "Sin iniciar" (ese caso se deriva a un asesor, sin agendar visita).
       const faltanFinal = camposFaltantesParaAgendar(data.perfil);
       const financiacionSinIniciar =
-        normalizeMetodoPagoCategoria(data.perfil.metodoPagoCategoria) ===
+        normalizeMetodoPagoCategoria(data.perfil.metodoPago) ===
         "Sin iniciar";
       if (!yaAgendo && text && !faltanFinal.length && !financiacionSinIniciar) {
         const t = norm(text);
