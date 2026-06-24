@@ -371,7 +371,7 @@ export function PropBot({
     [],
   );
 
-  // Perfil acumulado del lead (financiación, presupuesto, urgencia, plazo).
+  // Perfil acumulado del lead (método de pago, presupuesto, intención de compra).
   const buildPerfil = useCallback(() => {
     const l = leadRef.current;
     return {
@@ -379,10 +379,11 @@ export function PropBot({
       operacion: l.operacion,
       ubicacion: l.zona,
       tipo: l.tipo,
-      urgencia: l.urgencia,
-      financiamiento: l.financiamiento,
+      metodoPagoTexto: l.metodoPagoTexto,
+      metodoPagoCategoria: l.metodoPagoCategoria,
+      intencionCompraTexto: l.intencionCompraTexto,
+      intencionCompraCategoria: l.intencionCompraCategoria,
       presupuesto: l.presupuesto,
-      plazoCompra: l.plazoCompra,
     };
   }, []);
 
