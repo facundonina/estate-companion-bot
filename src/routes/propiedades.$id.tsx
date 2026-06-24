@@ -199,9 +199,17 @@ function PropertyDetail() {
         {/* Sidebar */}
         <aside className="space-y-6 lg:sticky lg:top-24 lg:self-start">
           <div className="rounded-2xl border border-border bg-card p-6 shadow-elevated">
-            <p className="text-sm text-muted-foreground">Precio</p>
+            <p className="text-sm text-muted-foreground">
+              Precio{p.operacion ? ` · ${p.operacion}` : ""}
+            </p>
             <p className="font-serif text-3xl font-bold text-primary">
               {formatPrice(p.precio, p.moneda)}
+              {p.operacion === "Alquiler" && (
+                <span className="text-base font-normal text-muted-foreground">
+                  {" "}
+                  /mes
+                </span>
+              )}
             </p>
 
             <div className="my-5 border-t border-border" />
