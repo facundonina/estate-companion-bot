@@ -176,20 +176,23 @@ interface BotLeadState extends BotLead {
   proposito?: string;
   piscina?: boolean;
   garage?: boolean;
-  urgencia?: string;
-  financiamiento?: string;
-  plazoCompra?: string;
+  // Método de pago: texto literal del usuario + categoría fija.
+  metodoPagoTexto?: string;
+  metodoPagoCategoria?: string;
+  // Intención de compra / plazo: texto literal del usuario + categoría fija.
+  intencionCompraTexto?: string;
+  intencionCompraCategoria?: string;
   prioridad?: string;
 }
 
 function calcPrioridad(lead: BotLeadState): string {
-  const financiamiento = lead.financiamiento || "";
-  const urgencia = lead.urgencia || "";
+  const categoria = lead.metodoPagoCategoria || "";
+  const intencion = lead.intencionCompraCategoria || "";
   const tieneDinero =
-    financiamiento === "Efectivo listo" ||
-    financiamiento === "Crédito hipotecario aprobado";
-  const urgenciaAlta = urgencia === "Menos de 3 meses";
-  const urgenciaMedia = urgencia === "3 a 6 meses";
+    categoria === "Efectivo listo" ||
+    categoria === "Crédito hipotecario aprobado";
+  const urgenciaAlta = intencion === "Menos de 3 meses";
+  const urgenciaMedia = intencion === "3 a 6 meses";
   if (tieneDinero && urgenciaAlta) return "Alta";
   if (tieneDinero && urgenciaMedia) return "Media";
   if (tieneDinero || urgenciaAlta) return "Media";
@@ -197,18 +200,22 @@ function calcPrioridad(lead: BotLeadState): string {
 }
 
 // Construye la fila de la planilla de Leads. El puntaje y la prioridad SIEMPRE
-// los calcula el sistema (computeLeadScore), nunca el modelo de Gemini.
+// los calcula el sistema (computeLeadScore) usando exclusivamente las CATEGORÍAS
+// fijas. En cambio, las columnas "Intención de compra" y "Método de pago" de la
+// planilla reciben el TEXTO LITERAL del usuario, no la categoría.
 function buildLeadRow(lead: BotLeadState, prop: Property): LeadRow {
-  const intencion = lead.urgencia || lead.plazoCompra || "";
-  const metodoPago = lead.financiamiento || "";
+  const intencionTexto =
+    lead.intencionCompraTexto || lead.intencionCompraCategoria || "";
+  const metodoPagoTexto =
+    lead.metodoPagoTexto || lead.metodoPagoCategoria || "";
   const operacion = lead.operacion || prop.operacion;
   const score = computeLeadScore({
     operacion,
     zona: lead.zona,
     tipo: lead.tipo,
     presupuesto: lead.presupuesto,
-    intencionCompra: intencion,
-    metodoPago,
+    intencionCompraCategoria: lead.intencionCompraCategoria,
+    metodoPagoCategoria: lead.metodoPagoCategoria,
     propiedadInteresId: prop.id,
     nombre: lead.nombre,
     telefono: lead.telefono,
@@ -222,8 +229,8 @@ function buildLeadRow(lead: BotLeadState, prop: Property): LeadRow {
     zona: lead.zona ?? "",
     tipo: lead.tipo ?? "",
     presupuesto: typeof lead.presupuesto === "number" ? lead.presupuesto : "",
-    intencionCompra: intencion,
-    metodoPago,
+    intencionCompra: intencionTexto,
+    metodoPago: metodoPagoTexto,
     operacion,
     propiedadInteres: `${prop.tipo} en ${prop.barrio}, ${prop.departamento} (#${prop.id})`,
     matchEnCatalogo: score.matchEnCatalogo ? "Sí" : "No",
@@ -239,9 +246,10 @@ function tieneDatosCalificacion(lead: BotLeadState): boolean {
   return Boolean(
     lead.operacion ||
       typeof lead.presupuesto === "number" ||
-      lead.urgencia ||
-      lead.plazoCompra ||
-      lead.financiamiento,
+      lead.intencionCompraTexto ||
+      lead.intencionCompraCategoria ||
+      lead.metodoPagoTexto ||
+      lead.metodoPagoCategoria,
   );
 }
 
