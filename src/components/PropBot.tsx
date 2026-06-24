@@ -681,7 +681,7 @@ export function PropBot({
         700,
       );
     }
-  }, [addMsg, botReply, botSay, confirming, recommendProps, selectedSlot, slotConfirmed]);
+  }, [addMsg, botReply, botSay, confirming, recommendProps, selectedSlot, slotConfirmed, registerLead]);
 
   return (
     <div className="flex h-[560px] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-card">
