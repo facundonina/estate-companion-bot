@@ -111,6 +111,20 @@ export function mapOperacion(text: string): "Venta" | "Alquiler" | null {
   return null;
 }
 
+function normalizeMetodoPagoCategoria(v: string | undefined): string | undefined {
+  if (!v) return undefined;
+  const n = norm(v);
+  if (n.includes("efectivo")) return "Efectivo listo";
+  if (n.includes("hipotecario") && n.includes("aprobad")) {
+    return "Crédito hipotecario aprobado";
+  }
+  if (n.includes("credito") && (n.includes("tramite") || n.includes("gestion"))) {
+    return "Crédito en trámite";
+  }
+  if (n.includes("sin iniciar") || n.includes("no definido")) return "Sin iniciar";
+  return v;
+}
+
 // Red de seguridad en código (no solo en el prompt): elimina cualquier bloque de
 // datos estructurados (JSON, arrays, bloques de código, líneas tipo "campo: valor"
 // crudas) que el modelo haya podido pegar por error en su respuesta de texto. Los
@@ -216,6 +230,9 @@ type PerfilLead = z.infer<typeof perfilSchema>;
 // Devuelve la lista de campos que faltan (vacía => se puede agendar).
 function camposFaltantesParaAgendar(perfil: PerfilLead): string[] {
   const faltan: string[] = [];
+  const metodoPagoCategoria = normalizeMetodoPagoCategoria(
+    perfil.metodoPagoCategoria,
+  );
   if (!perfil.operacion) faltan.push("operación (compra o alquiler)");
   if (typeof perfil.presupuesto !== "number" || perfil.presupuesto <= 0)
     faltan.push("presupuesto");
@@ -224,7 +241,7 @@ function camposFaltantesParaAgendar(perfil: PerfilLead): string[] {
     perfil.intencionCompraCategoria === "Sin definir"
   )
     faltan.push("intención de compra o plazo de mudanza");
-  if (!perfil.metodoPagoCategoria || perfil.metodoPagoCategoria === "Sin iniciar")
+  if (!metodoPagoCategoria || metodoPagoCategoria === "Sin iniciar")
     faltan.push("método de pago");
   return faltan;
 }
@@ -411,7 +428,9 @@ export const chatWithBot = createServerFn({ method: "POST" })
             if (patch.metodo_pago_texto)
               clean.metodoPagoTexto = patch.metodo_pago_texto;
             if (patch.metodo_pago_categoria)
-              clean.metodoPagoCategoria = patch.metodo_pago_categoria;
+              clean.metodoPagoCategoria = normalizeMetodoPagoCategoria(
+                patch.metodo_pago_categoria,
+              );
             if (typeof patch.presupuesto === "number" && patch.presupuesto > 0)
               clean.presupuesto = Math.round(patch.presupuesto);
             if (patch.intencion_compra_texto)
@@ -434,7 +453,10 @@ export const chatWithBot = createServerFn({ method: "POST" })
             // ni mostramos el calendario: derivamos a un asesor para los pasos de
             // financiación. El lead se registra igual por el flujo normal de fin
             // de conversación, solo que sin generar un evento de calendario.
-            if (data.perfil.metodoPagoCategoria === "Sin iniciar") {
+            if (
+              normalizeMetodoPagoCategoria(data.perfil.metodoPagoCategoria) ===
+              "Sin iniciar"
+            ) {
               return {
                 reservaConfirmada: false,
                 puedeAgendar: false,
