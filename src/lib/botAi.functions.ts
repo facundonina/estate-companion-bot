@@ -361,6 +361,32 @@ export const chatWithBot = createServerFn({ method: "POST" })
       });
 
       const text = (result.text || "").trim();
+
+      // Red de seguridad: si el modelo escribió un cierre ofreciendo coordinar
+      // o agendar una reunión/visita pero NO llamó a la herramienta
+      // agendar_reunion, forzamos la consulta REAL a la agenda. Así nunca se
+      // muestra un cierre con horarios inventados o sin turnos reales.
+      const yaAgendo = actions.some((a) => a.type === "agendar_reunion");
+      if (!yaAgendo && text) {
+        const t = norm(text);
+        const ofreceCoordinar =
+          /\b(agend|coordin)/.test(t) &&
+          /(reuni|visita|recorrid|llamad|turno|cita|horari|agenda)/.test(t);
+        if (ofreceCoordinar) {
+          try {
+            const { getAvailableSlotsCore } = await import(
+              "@/lib/calendar.server"
+            );
+            const slots = await getAvailableSlotsCore();
+            if (slots.length) {
+              actions.push({ type: "agendar_reunion", slots });
+            }
+          } catch (err) {
+            console.error("[botAi] safety-net agendar_reunion:", err);
+          }
+        }
+      }
+
       return { text: text || null, actions };
     } catch (err) {
       console.error("[botAi] Error en chatWithBot:", err);
