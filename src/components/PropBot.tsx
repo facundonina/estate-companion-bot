@@ -100,14 +100,17 @@ interface BotLeadState extends BotLead {
 }
 
 function calcPrioridad(lead: BotLeadState): string {
-  const categoria = lead.metodoPagoCategoria || "";
-  const tieneDinero =
-    categoria === "Efectivo listo" ||
-    categoria === "Crédito hipotecario aprobado";
-  if (tieneDinero) return "Alta";
-  if (categoria === "Sin iniciar") return "Baja";
-  if (categoria === "Crédito en trámite") return "Media";
-  return "Baja";
+  return computeLeadScore({
+    operacion: lead.operacion,
+    zona: lead.zona,
+    tipo: lead.tipo,
+    presupuesto: lead.presupuesto,
+    intencionCompraCategoria: lead.intencionCompraCategoria,
+    metodoPagoCategoria: lead.metodoPagoCategoria,
+    nombre: lead.nombre,
+    telefono: lead.telefono,
+    email: lead.email,
+  }).prioridad;
 }
 
 // Construye la fila de la planilla de Leads. El puntaje y la prioridad SIEMPRE
