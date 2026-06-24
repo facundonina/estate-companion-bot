@@ -180,9 +180,15 @@ export function computeLeadScore(
   if (plataDisponible(perfil.metodoPagoCategoria)) {
     // Plata disponible (efectivo o crédito hipotecario aprobado) => Alta directo.
     prioridad = "Alta";
-  } else if (puntaje >= 6) prioridad = "Alta";
-  else if (puntaje >= 3) prioridad = "Media";
-  else prioridad = "Baja";
+  } else {
+    // Tope de prioridad: si el método de pago NO es "Efectivo listo" ni
+    // "Crédito hipotecario aprobado" (es crédito en trámite o sin definir), la
+    // prioridad NUNCA puede ser Alta, sin importar el puntaje total. El máximo es
+    // Media, y cae a Baja si el puntaje sin contar financiación (urgencia + match
+    // + completitud) es muy bajo (2 o menos).
+    const sinFinanciacion = pIntencion + pMatch + pCompletitud;
+    prioridad = sinFinanciacion <= 2 ? "Baja" : "Media";
+  }
 
   return { puntaje, prioridad, matchEnCatalogo: match, esVenta };
 }
