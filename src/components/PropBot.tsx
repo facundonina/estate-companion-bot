@@ -640,11 +640,7 @@ export function PropBot({
         awaitingHumanRef.current = true;
         await botReply(
           {
-            text: "Tranquilo, te noto un poco frustrado 😟. ¿Querés que te ponga en contacto con un humano de nuestro equipo?",
-            quickReplies: [
-              { label: "Sí, hablar con un humano", value: "Sí" },
-              { label: "No, seguir acá", value: "No" },
-            ],
+            text: "Tranquilo, te noto un poco frustrado 😟. ¿Querés que te ponga en contacto con un humano de nuestro equipo, o preferís que sigamos por acá?",
           },
           600,
         );
