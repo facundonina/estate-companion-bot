@@ -298,7 +298,13 @@ export const chatWithBot = createServerFn({ method: "POST" })
             plazoCompra: z
               .string()
               .optional()
-              .describe("En cuánto tiempo planea comprar"),
+              .describe("En cuánto tiempo planea comprar (texto original)"),
+            plazoMeses: z
+              .number()
+              .optional()
+              .describe(
+                "Plazo de compra en NÚMERO ENTERO de meses exacto (ej: 'en 2 meses' -> 2, 'en 8 meses' -> 8, 'este año' -> 12, 'en 2 años' -> 24)",
+              ),
           }),
           execute: async (patch) => {
             const clean: {
@@ -306,12 +312,15 @@ export const chatWithBot = createServerFn({ method: "POST" })
               presupuesto?: number;
               urgencia?: string;
               plazoCompra?: string;
+              plazoMeses?: number;
             } = {};
             if (patch.financiacion) clean.financiamiento = patch.financiacion;
             if (typeof patch.presupuesto === "number" && patch.presupuesto > 0)
               clean.presupuesto = Math.round(patch.presupuesto);
             if (patch.urgencia) clean.urgencia = patch.urgencia;
             if (patch.plazoCompra) clean.plazoCompra = patch.plazoCompra;
+            if (typeof patch.plazoMeses === "number" && patch.plazoMeses > 0)
+              clean.plazoMeses = Math.round(patch.plazoMeses);
             actions.push({ type: "actualizar_perfil_lead", patch: clean });
             return { ok: true };
           },
