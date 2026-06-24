@@ -195,13 +195,21 @@ export const chatWithBot = createServerFn({ method: "POST" })
             ubicacion: z
               .string()
               .optional()
-              .describe("Zona, barrio o departamento (ej: Pocitos, Maldonado)"),
+              .describe(
+                "Zona, barrio o departamento (ej: Pocitos, Carrasco, Punta del Este, Maldonado, Colonia)",
+              ),
+            operacion: z
+              .enum(["Venta", "Alquiler"])
+              .optional()
+              .describe(
+                "Tipo de operación: 'Venta' para comprar, 'Alquiler' para alquilar. Los precios de alquiler son mensuales y mucho más bajos que los de venta.",
+              ),
             precioMin: z.number().optional().describe("Precio mínimo en USD"),
             precioMax: z.number().optional().describe("Precio máximo en USD"),
             tipo: z
               .string()
               .optional()
-              .describe("Tipo de propiedad (Apartamento, Casa, Lote, etc.)"),
+              .describe("Tipo de propiedad (Apartamento, Casa, Lote, Campo)"),
             financiacion: z
               .boolean()
               .optional()
@@ -210,9 +218,11 @@ export const chatWithBot = createServerFn({ method: "POST" })
           execute: async (filtros) => {
             const u = filtros.ubicacion ? norm(filtros.ubicacion) : null;
             const t = filtros.tipo ? norm(filtros.tipo) : null;
+            const op = filtros.operacion ? norm(filtros.operacion) : null;
             const matches = properties
               .filter((p) => p.disponible)
               .filter((p) => {
+                if (op && norm(p.operacion) !== op) return false;
                 if (
                   u &&
                   !norm(`${p.zona} ${p.barrio} ${p.departamento}`).includes(u)
