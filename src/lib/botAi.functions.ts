@@ -438,6 +438,14 @@ export const chatWithBot = createServerFn({ method: "POST" })
             if (patch.intencion_compra_categoria)
               clean.intencionCompraCategoria = patch.intencion_compra_categoria;
             actions.push({ type: "actualizar_perfil_lead", patch: clean });
+            // Aplicamos el patch al perfil EN MEMORIA de esta misma llamada para
+            // que las tools que corran después en el mismo turno (sobre todo
+            // agendar_reunion) lean la categoría de financiación ACTUALIZADA y
+            // no el valor viejo con el que arrancó la request. Sin esto, el
+            // usuario podía decir "quiero crédito pero todavía no arranqué" y el
+            // bot ofrecía el calendario igual, porque agendar_reunion seguía
+            // viendo el metodoPagoCategoria anterior al patch.
+            Object.assign(data.perfil, clean);
             return { ok: true };
           },
         }),
@@ -584,8 +592,15 @@ export const chatWithBot = createServerFn({ method: "POST" })
       // muestra un cierre con horarios inventados o sin turnos reales.
       const yaAgendo = actions.some((a) => a.type === "agendar_reunion");
       // La red de seguridad NUNCA debe forzar turnos si el lead no está
-      // calificado: respeta el mismo gate que la tool agendar_reunion.
-      if (!yaAgendo && text && !faltanParaAgendar.length) {
+      // calificado: respeta el mismo gate que la tool agendar_reunion. Lo
+      // recalculamos sobre el perfil YA actualizado por las tools de este turno
+      // (no el snapshot inicial), y nunca forzamos calendario si la financiación
+      // es "Sin iniciar" (ese caso se deriva a un asesor, sin agendar visita).
+      const faltanFinal = camposFaltantesParaAgendar(data.perfil);
+      const financiacionSinIniciar =
+        normalizeMetodoPagoCategoria(data.perfil.metodoPagoCategoria) ===
+        "Sin iniciar";
+      if (!yaAgendo && text && !faltanFinal.length && !financiacionSinIniciar) {
         const t = norm(text);
         const ofreceCoordinar =
           /\b(agend|coordin)/.test(t) &&
