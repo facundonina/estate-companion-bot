@@ -390,6 +390,11 @@ export function PropBot({
   const registerLead = useCallback((opts?: { beacon?: boolean }) => {
     if (leadSentRef.current) return;
     if (!interactedRef.current) return; // no registramos a quien nunca interactuó
+    // No ensuciamos la planilla con filas vacías: si el lead no tiene ningún
+    // dato de calificación (ni operación, ni presupuesto, ni intención de compra,
+    // ni método de pago), es una sesión de prueba o alguien que se fue sin
+    // avanzar nada — no aporta nada al vendedor, así que no la escribimos.
+    if (!tieneDatosCalificacion(leadRef.current)) return;
     leadSentRef.current = true;
     if (inactivityTimerRef.current) {
       clearTimeout(inactivityTimerRef.current);
