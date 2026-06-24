@@ -711,16 +711,14 @@ export const interpretAnswer = createServerFn({ method: "POST" })
         output: Output.object({
           schema: z.object({
             operacion: z.string(),
-            metodoPagoTexto: z.string(),
-            metodoPagoCategoria: z.string(),
+            metodoPago: z.string(),
             presupuesto: z.number().optional(),
             presupuestoUSD: z.number().optional(),
-            intencionCompraTexto: z.string(),
-            intencionCompraCategoria: z.string(),
+            intencionCompra: z.string(),
           }),
         }),
         system:
-          "Sos un asistente de una inmobiliaria uruguaya. Extraé del último mensaje del usuario (usando el contexto) SOLO datos de calificación: operación (devolvé \"Venta\" si quiere comprar -comprar, comprarla, compra-, \"Alquiler\" si quiere alquilar -alquilar, rentar, alquilarla-), método de pago y intención de compra (para cada uno devolvé DOS valores: el texto literal que dijo el usuario, y la categoría fija que mejor corresponda) y presupuesto en USD. Para metodoPagoCategoria usá EXACTAMENTE una de: \"Efectivo listo\", \"Crédito hipotecario aprobado\", \"Crédito en trámite\", \"Sin iniciar\". Al contado / tengo la plata / en efectivo = \"Efectivo listo\". Crédito aprobado o preaprobado por el banco = \"Crédito hipotecario aprobado\". \"Crédito en trámite\" SOLO si la persona ya inició gestión activa con el banco y entregó documentación o está en evaluación. Si quiere crédito pero no entregó papeles, no inició trámite con el banco, está averiguando, o no lo definió, devolvé \"Sin iniciar\", nunca \"Crédito en trámite\". Para intencionCompraCategoria usá EXACTAMENTE una de: \"Menos de 3 meses\", \"3 a 6 meses\", \"En el año\", \"Sin definir\" (lo antes posible / ya / necesito mudarme ahora = \"Menos de 3 meses\"). No inventes: si un dato no aparece, devolvé \"NONE\" para los textos y 0 para el presupuesto. Si el usuario no dio método de pago, devolvé categoría \"Sin iniciar\"; si no dio intención, devolvé \"Sin definir\".",
+          "Sos un asistente de una inmobiliaria uruguaya. Extraé del último mensaje del usuario (usando el contexto) SOLO datos de calificación: operación (devolvé \"Venta\" si quiere comprar -comprar, comprarla, compra-, \"Alquiler\" si quiere alquilar -alquilar, rentar, alquilarla-), método de pago, intención de compra y presupuesto en USD. Interpretá el lenguaje natural del usuario y encasillalo directamente en la categoría fija que corresponda. Para metodoPago usá EXACTAMENTE una de: \"Efectivo listo\", \"Crédito hipotecario aprobado\", \"Crédito en trámite\", \"Sin iniciar\". Al contado / tengo la plata / en efectivo = \"Efectivo listo\". Crédito aprobado o preaprobado por el banco = \"Crédito hipotecario aprobado\". \"Crédito en trámite\" SOLO si la persona ya inició gestión activa con el banco y entregó documentación o está en evaluación. Si quiere crédito pero no entregó papeles, no inició trámite con el banco, está averiguando, o no lo definió, devolvé \"Sin iniciar\", nunca \"Crédito en trámite\". Para intencionCompra usá EXACTAMENTE una de: \"Menos de 3 meses\", \"3 a 6 meses\", \"En el año\", \"Sin definir\" (lo antes posible / ya / necesito mudarme ahora = \"Menos de 3 meses\"). No inventes: si el usuario no dio método de pago, devolvé \"Sin iniciar\"; si no dio intención, devolvé \"Sin definir\"; si no dio presupuesto, devolvé 0.",
         messages: [
           ...historyMessages,
           {
