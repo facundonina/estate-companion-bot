@@ -141,3 +141,32 @@ export async function sendLeadRow(row: LeadRow) {
     return { ok: false as const, reason: "fetch-error" };
   }
 }
+
+/**
+ * Envía la fila como ÚLTIMO recurso cuando la página se está cerrando o quedó
+ * inactiva. Usa navigator.sendBeacon: el navegador garantiza el envío aunque la
+ * pestaña se cierre, cosa que un fetch normal no asegura. Si sendBeacon no está
+ * disponible, cae a sendLeadRow con keepalive.
+ */
+export function sendLeadBeacon(row: LeadRow): boolean {
+  try {
+    const payload = JSON.stringify(buildBody(row));
+    if (typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function") {
+      const blob = new Blob([payload], { type: "text/plain;charset=utf-8" });
+      const ok = navigator.sendBeacon(SHEETS_WEBHOOK_URL, blob);
+      if (ok) return true;
+    }
+    // Fallback: fetch con keepalive (también sobrevive al cierre, mejor esfuerzo).
+    void fetch(SHEETS_WEBHOOK_URL, {
+      method: "POST",
+      mode: "no-cors",
+      keepalive: true,
+      headers: { "Content-Type": "text/plain" },
+      body: payload,
+    }).catch(() => {});
+    return true;
+  } catch (err) {
+    console.error("[leadSheet] No se pudo enviar el beacon:", err);
+    return false;
+  }
+}
