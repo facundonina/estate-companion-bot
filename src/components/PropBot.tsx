@@ -324,6 +324,7 @@ export function PropBot({
       presupuesto?: number;
       urgencia?: string;
       plazoCompra?: string;
+      plazoMeses?: number;
     }) => {
       const l = leadRef.current;
       let changed = false;
@@ -343,8 +344,12 @@ export function PropBot({
         l.plazoCompra = patch.plazoCompra;
         changed = true;
       }
+      if (typeof patch.plazoMeses === "number" && patch.plazoMeses > 0) {
+        l.plazoMeses = patch.plazoMeses;
+        changed = true;
+      }
       if (changed) {
-        l.prioridad = calcPrioridad(l);
+        recomputeScore();
         mergeStoredLead({
           urgencia: l.urgencia,
           financiamiento: l.financiamiento,
@@ -353,7 +358,7 @@ export function PropBot({
         });
       }
     },
-    [],
+    [recomputeScore],
   );
 
   // Núcleo conversacional: en cada mensaje del usuario se envía el historial
