@@ -466,7 +466,9 @@ export const chatWithBot = createServerFn({ method: "POST" })
       // agendar_reunion, forzamos la consulta REAL a la agenda. Así nunca se
       // muestra un cierre con horarios inventados o sin turnos reales.
       const yaAgendo = actions.some((a) => a.type === "agendar_reunion");
-      if (!yaAgendo && text) {
+      // La red de seguridad NUNCA debe forzar turnos si el lead no está
+      // calificado: respeta el mismo gate que la tool agendar_reunion.
+      if (!yaAgendo && text && !faltanParaAgendar.length) {
         const t = norm(text);
         const ofreceCoordinar =
           /\b(agend|coordin)/.test(t) &&
