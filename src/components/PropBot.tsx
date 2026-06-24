@@ -584,9 +584,18 @@ export function PropBot({
         (result?.text || "").trim() ||
         "Perdón, no te entendí bien. ¿Me lo contás de nuevo?";
 
+      // Si el bot está haciendo la pregunta de financiación, plazo o la de
+      // cierre (ver opción similar / coordinar visita), ofrecemos botones de
+      // respuesta rápida para evitar respuestas cortas y ambiguas.
+      if (!extra.quickReplies) {
+        const qr = detectQuickReplies(text);
+        if (qr) extra.quickReplies = qr;
+      }
+
       await new Promise((r) => setTimeout(r, 300));
       setTyping(false);
       addMsg({ role: "bot", text, ...extra });
+
     },
     [chat, interpret, fullHistory, buildPerfil, applyPatch, addMsg],
   );
