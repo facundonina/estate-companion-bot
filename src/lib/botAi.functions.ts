@@ -301,8 +301,14 @@ export const chatWithBot = createServerFn({ method: "POST" })
         // -------------------------------------------------------------------
         actualizar_perfil_lead: tool({
           description:
-            "Guarda los datos de calificación que van apareciendo en la charla (financiación, presupuesto, urgencia, plazo de compra). Llamala apenas detectes alguno de estos datos. Corre en segundo plano: no bloquea ni demora tu respuesta.",
+            "Guarda los datos de calificación que van apareciendo en la charla (operación, financiación, presupuesto, urgencia, plazo de compra). Llamala apenas detectes alguno de estos datos. Corre en segundo plano: no bloquea ni demora tu respuesta.",
           inputSchema: z.object({
+            operacion: z
+              .enum(["Venta", "Alquiler"])
+              .optional()
+              .describe(
+                "Operación que busca el usuario: 'Venta' si quiere comprar, 'Alquiler' si quiere alquilar.",
+              ),
             financiacion: z
               .string()
               .optional()
@@ -322,11 +328,13 @@ export const chatWithBot = createServerFn({ method: "POST" })
           }),
           execute: async (patch) => {
             const clean: {
+              operacion?: string;
               financiamiento?: string;
               presupuesto?: number;
               urgencia?: string;
               plazoCompra?: string;
             } = {};
+            if (patch.operacion) clean.operacion = patch.operacion;
             if (patch.financiacion) clean.financiamiento = patch.financiacion;
             if (typeof patch.presupuesto === "number" && patch.presupuesto > 0)
               clean.presupuesto = Math.round(patch.presupuesto);
