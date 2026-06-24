@@ -943,7 +943,7 @@ export function PropBot({
                     <button
                       key={qr.value}
                       type="button"
-                      onClick={() => handleSend(qr.value)}
+                      onClick={() => handleQuickReply(qr)}
                       className="rounded-full border border-border bg-card px-3 py-1.5 text-[12px] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
                     >
                       {qr.label}
