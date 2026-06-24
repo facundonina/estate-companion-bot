@@ -9,10 +9,9 @@ export interface StoredLead {
   email: string;
   mensaje?: string;
   // Datos de calificación que se hayan recolectado en un chat previo.
-  metodoPagoTexto?: string;
-  metodoPagoCategoria?: string;
-  intencionCompraTexto?: string;
-  intencionCompraCategoria?: string;
+  // Una sola categoría fija por campo (sin texto literal separado).
+  metodoPago?: string;
+  intencionCompra?: string;
   presupuesto?: number;
   prioridad?: string;
 }

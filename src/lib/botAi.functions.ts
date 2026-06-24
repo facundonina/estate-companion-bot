@@ -48,7 +48,7 @@ Nunca repitas en tu respuesta de texto el resultado crudo (JSON, array, ni ning�
 Calificación del lead:
 Durante la conversación, identificá y guardá en el perfil del lead, vía actualizar_perfil_lead, estos campos a medida que vayan apareciendo: operación (si el usuario muestra interés en una propiedad puntual, la operación es la de esa propiedad y NO se la preguntes; solo preguntá si busca comprar o alquilar en charlas generales, cuando todavía no eligió ninguna propiedad puntual), zona, tipo de propiedad, presupuesto, intención de compra o plazo de mudanza, método de pago, y el ID de la propiedad puntual en la que el usuario mostró interés concreto entre los resultados de buscar_propiedades. El sistema registra al lead en la planilla automáticamente al final de la conversación (cuando se confirma la reunión o el usuario se despide); no tenés ninguna herramienta de registro, así que no intentes registrar nada vos mismo. Nunca calcules ni menciones vos mismo un puntaje o una categoría de prioridad — eso lo hace el sistema automáticamente, no es algo que tengas que decidir ni comunicar.
 
-Cuando el usuario te diga cómo piensa pagar o para cuándo necesita la propiedad, guardá su frase literal y además la categoría que mejor corresponda, interpretando sinónimos naturales. Para método de pago usá exactamente una de estas cuatro categorías: Efectivo listo, Crédito hipotecario aprobado, Crédito en trámite, Sin iniciar. Al contado / tengo la plata / en efectivo equivalen a Efectivo listo. Crédito ya aprobado / preaprobado por el banco equivale a Crédito hipotecario aprobado. Crédito en trámite SOLO aplica si la persona ya está activamente tramitando con el banco, con gestión iniciada y documentación entregada o en evaluación. Si quiere crédito pero todavía no entregó papeles, no inició gestión con el banco, está averiguando, o no lo definió, categorizalo como Sin iniciar, no como Crédito en trámite. Para intención de compra: lo antes posible / ya / necesito mudarme ahora equivalen a Menos de 3 meses. Nunca dejes la categoría sin asignar si el usuario dio una respuesta que claramente corresponde a alguna de las opciones.`;
+Cuando el usuario te diga cómo piensa pagar o para cuándo necesita la propiedad, interpretá lo que dijo en lenguaje natural y guardá directamente la categoría fija que mejor corresponda (no guardes el texto literal, solo la categoría). Para método de pago (campo metodo_pago) usá exactamente una de estas cuatro categorías: Efectivo listo, Crédito hipotecario aprobado, Crédito en trámite, Sin iniciar. Al contado / tengo la plata / en efectivo equivalen a Efectivo listo. Crédito ya aprobado / preaprobado por el banco equivale a Crédito hipotecario aprobado. Crédito en trámite SOLO aplica si la persona ya está activamente tramitando con el banco, con gestión iniciada y documentación entregada o en evaluación. Si quiere crédito pero todavía no entregó papeles, no inició gestión con el banco, está averiguando, o no lo definió (por ejemplo "quiero crédito pero no inicié nada"), categorizalo como Sin iniciar, no como Crédito en trámite. Para intención de compra (campo intencion_compra) usá exactamente una de estas cuatro categorías: Menos de 3 meses, 3 a 6 meses, En el año, Sin definir. Lo antes posible / ya / necesito mudarme ya equivalen a Menos de 3 meses. Nunca dejes la categoría sin asignar si el usuario dio una respuesta que claramente corresponde a alguna de las opciones.`;
 
 // Reglas de salida para la burbuja de chat.
 const STYLE_RULES = `Reglas de salida:
@@ -196,11 +196,9 @@ export type BotAction =
       type: "actualizar_perfil_lead";
       patch: {
         operacion?: string;
-        metodoPagoTexto?: string;
-        metodoPagoCategoria?: string;
+        metodoPago?: string;
         presupuesto?: number;
-        intencionCompraTexto?: string;
-        intencionCompraCategoria?: string;
+        intencionCompra?: string;
       };
     }
   | { type: "agendar_reunion"; slots: CalendarSlot[] };
@@ -215,12 +213,10 @@ const perfilSchema = z.object({
   operacion: z.string().max(40).optional(),
   ubicacion: z.string().max(120).optional(),
   tipo: z.string().max(60).optional(),
-  // Método de pago: texto literal del usuario + categoría fija.
-  metodoPagoTexto: z.string().max(200).optional(),
-  metodoPagoCategoria: z.string().max(60).optional(),
-  // Intención de compra / plazo: texto literal del usuario + categoría fija.
-  intencionCompraTexto: z.string().max(200).optional(),
-  intencionCompraCategoria: z.string().max(60).optional(),
+  // Método de pago: una de las categorías fijas (sin texto literal separado).
+  metodoPago: z.string().max(60).optional(),
+  // Intención de compra / plazo: una de las categorías fijas.
+  intencionCompra: z.string().max(60).optional(),
   presupuesto: z.number().optional(),
 });
 
@@ -230,18 +226,13 @@ type PerfilLead = z.infer<typeof perfilSchema>;
 // Devuelve la lista de campos que faltan (vacía => se puede agendar).
 function camposFaltantesParaAgendar(perfil: PerfilLead): string[] {
   const faltan: string[] = [];
-  const metodoPagoCategoria = normalizeMetodoPagoCategoria(
-    perfil.metodoPagoCategoria,
-  );
+  const metodoPago = normalizeMetodoPagoCategoria(perfil.metodoPago);
   if (!perfil.operacion) faltan.push("operación (compra o alquiler)");
   if (typeof perfil.presupuesto !== "number" || perfil.presupuesto <= 0)
     faltan.push("presupuesto");
-  if (
-    !perfil.intencionCompraCategoria ||
-    perfil.intencionCompraCategoria === "Sin definir"
-  )
+  if (!perfil.intencionCompra || perfil.intencionCompra === "Sin definir")
     faltan.push("intención de compra o plazo de mudanza");
-  if (!metodoPagoCategoria || metodoPagoCategoria === "Sin iniciar")
+  if (!metodoPago || metodoPago === "Sin iniciar")
     faltan.push("método de pago");
   return faltan;
 }
@@ -381,13 +372,7 @@ export const chatWithBot = createServerFn({ method: "POST" })
               .describe(
                 "Operación que busca el usuario: 'Venta' si quiere comprar, 'Alquiler' si quiere alquilar.",
               ),
-            metodo_pago_texto: z
-              .string()
-              .optional()
-              .describe(
-                "El texto literal que dijo el usuario sobre cómo piensa pagar, tal cual lo escribió o algo muy cercano.",
-              ),
-            metodo_pago_categoria: z
+            metodo_pago: z
               .enum([
                 "Efectivo listo",
                 "Crédito hipotecario aprobado",
@@ -396,47 +381,33 @@ export const chatWithBot = createServerFn({ method: "POST" })
               ])
               .optional()
               .describe(
-                "La categoría fija de método de pago que mejor corresponde a lo que dijo el usuario.",
+                "La categoría fija de método de pago que mejor corresponde a lo que dijo el usuario (interpretá su lenguaje natural y encasillalo en una de estas cuatro).",
               ),
             presupuesto: z
               .number()
               .optional()
               .describe("Presupuesto aproximado en USD"),
-            intencion_compra_texto: z
-              .string()
-              .optional()
-              .describe(
-                "El texto literal que dijo el usuario sobre para cuándo necesita la propiedad, tal cual lo escribió o algo muy cercano.",
-              ),
-            intencion_compra_categoria: z
+            intencion_compra: z
               .enum(["Menos de 3 meses", "3 a 6 meses", "En el año", "Sin definir"])
               .optional()
               .describe(
-                "La categoría fija de intención de compra / plazo de mudanza que mejor corresponde a lo que dijo el usuario.",
+                "La categoría fija de intención de compra / plazo de mudanza que mejor corresponde a lo que dijo el usuario (interpretá su lenguaje natural y encasillalo en una de estas cuatro).",
               ),
           }),
           execute: async (patch) => {
             const clean: {
               operacion?: string;
-              metodoPagoTexto?: string;
-              metodoPagoCategoria?: string;
+              metodoPago?: string;
               presupuesto?: number;
-              intencionCompraTexto?: string;
-              intencionCompraCategoria?: string;
+              intencionCompra?: string;
             } = {};
             if (patch.operacion) clean.operacion = patch.operacion;
-            if (patch.metodo_pago_texto)
-              clean.metodoPagoTexto = patch.metodo_pago_texto;
-            if (patch.metodo_pago_categoria)
-              clean.metodoPagoCategoria = normalizeMetodoPagoCategoria(
-                patch.metodo_pago_categoria,
-              );
+            if (patch.metodo_pago)
+              clean.metodoPago = normalizeMetodoPagoCategoria(patch.metodo_pago);
             if (typeof patch.presupuesto === "number" && patch.presupuesto > 0)
               clean.presupuesto = Math.round(patch.presupuesto);
-            if (patch.intencion_compra_texto)
-              clean.intencionCompraTexto = patch.intencion_compra_texto;
-            if (patch.intencion_compra_categoria)
-              clean.intencionCompraCategoria = patch.intencion_compra_categoria;
+            if (patch.intencion_compra)
+              clean.intencionCompra = patch.intencion_compra;
             actions.push({ type: "actualizar_perfil_lead", patch: clean });
             // Aplicamos el patch al perfil EN MEMORIA de esta misma llamada para
             // que las tools que corran después en el mismo turno (sobre todo
@@ -444,7 +415,7 @@ export const chatWithBot = createServerFn({ method: "POST" })
             // no el valor viejo con el que arrancó la request. Sin esto, el
             // usuario podía decir "quiero crédito pero todavía no arranqué" y el
             // bot ofrecía el calendario igual, porque agendar_reunion seguía
-            // viendo el metodoPagoCategoria anterior al patch.
+            // viendo el metodoPago anterior al patch.
             Object.assign(data.perfil, clean);
             return { ok: true };
           },
@@ -462,7 +433,7 @@ export const chatWithBot = createServerFn({ method: "POST" })
             // financiación. El lead se registra igual por el flujo normal de fin
             // de conversación, solo que sin generar un evento de calendario.
             if (
-              normalizeMetodoPagoCategoria(data.perfil.metodoPagoCategoria) ===
+              normalizeMetodoPagoCategoria(data.perfil.metodoPago) ===
               "Sin iniciar"
             ) {
               return {
@@ -533,15 +504,11 @@ export const chatWithBot = createServerFn({ method: "POST" })
         p.operacion ? `operación: ${p.operacion}` : null,
         p.ubicacion ? `ubicación de interés: ${p.ubicacion}` : null,
         p.tipo ? `tipo de interés: ${p.tipo}` : null,
-        p.metodoPagoTexto
-          ? `método de pago: ${p.metodoPagoTexto}${p.metodoPagoCategoria ? ` (${p.metodoPagoCategoria})` : ""}`
-          : null,
+        p.metodoPago ? `método de pago: ${p.metodoPago}` : null,
         typeof p.presupuesto === "number"
           ? `presupuesto: USD ${p.presupuesto.toLocaleString("es-UY")}`
           : null,
-        p.intencionCompraTexto
-          ? `intención de compra: ${p.intencionCompraTexto}${p.intencionCompraCategoria ? ` (${p.intencionCompraCategoria})` : ""}`
-          : null,
+        p.intencionCompra ? `intención de compra: ${p.intencionCompra}` : null,
       ].filter(Boolean);
       contextLines.push(
         perfilLines.length
@@ -598,7 +565,7 @@ export const chatWithBot = createServerFn({ method: "POST" })
       // es "Sin iniciar" (ese caso se deriva a un asesor, sin agendar visita).
       const faltanFinal = camposFaltantesParaAgendar(data.perfil);
       const financiacionSinIniciar =
-        normalizeMetodoPagoCategoria(data.perfil.metodoPagoCategoria) ===
+        normalizeMetodoPagoCategoria(data.perfil.metodoPago) ===
         "Sin iniciar";
       if (!yaAgendo && text && !faltanFinal.length && !financiacionSinIniciar) {
         const t = norm(text);
@@ -687,16 +654,14 @@ export const generateBotMessage = createServerFn({ method: "POST" })
 // calificación (método de pago, presupuesto, intención de compra) del mensaje
 // del usuario para alimentar actualizar_perfil_lead. Ya NO decide si se repite
 // una pregunta ni controla el flujo. Devuelve siempre un objeto seguro.
-// Para método de pago e intención de compra devuelve tanto el texto literal
-// como la categoría fija (la misma lista que usa la tool y el scoring).
+// Para método de pago e intención de compra devuelve directamente la categoría
+// fija (la misma lista que usa la tool y el scoring), sin texto literal.
 // ===========================================================================
 export interface ProfilePatch {
   operacion: string | null;
-  metodoPagoTexto: string | null;
-  metodoPagoCategoria: string | null;
+  metodoPago: string | null;
   presupuesto: number | null;
-  intencionCompraTexto: string | null;
-  intencionCompraCategoria: string | null;
+  intencionCompra: string | null;
 }
 
 const interpretInputSchema = z.object({
@@ -720,11 +685,9 @@ export const interpretAnswer = createServerFn({ method: "POST" })
     const operacionDet = mapOperacion(data.message);
     const empty: ProfilePatch = {
       operacion: operacionDet,
-      metodoPagoTexto: null,
-      metodoPagoCategoria: null,
+      metodoPago: null,
       presupuesto: null,
-      intencionCompraTexto: null,
-      intencionCompraCategoria: null,
+      intencionCompra: null,
     };
 
     try {
@@ -748,16 +711,14 @@ export const interpretAnswer = createServerFn({ method: "POST" })
         output: Output.object({
           schema: z.object({
             operacion: z.string(),
-            metodoPagoTexto: z.string(),
-            metodoPagoCategoria: z.string(),
+            metodoPago: z.string(),
             presupuesto: z.number().optional(),
             presupuestoUSD: z.number().optional(),
-            intencionCompraTexto: z.string(),
-            intencionCompraCategoria: z.string(),
+            intencionCompra: z.string(),
           }),
         }),
         system:
-          "Sos un asistente de una inmobiliaria uruguaya. Extraé del último mensaje del usuario (usando el contexto) SOLO datos de calificación: operación (devolvé \"Venta\" si quiere comprar -comprar, comprarla, compra-, \"Alquiler\" si quiere alquilar -alquilar, rentar, alquilarla-), método de pago y intención de compra (para cada uno devolvé DOS valores: el texto literal que dijo el usuario, y la categoría fija que mejor corresponda) y presupuesto en USD. Para metodoPagoCategoria usá EXACTAMENTE una de: \"Efectivo listo\", \"Crédito hipotecario aprobado\", \"Crédito en trámite\", \"Sin iniciar\". Al contado / tengo la plata / en efectivo = \"Efectivo listo\". Crédito aprobado o preaprobado por el banco = \"Crédito hipotecario aprobado\". \"Crédito en trámite\" SOLO si la persona ya inició gestión activa con el banco y entregó documentación o está en evaluación. Si quiere crédito pero no entregó papeles, no inició trámite con el banco, está averiguando, o no lo definió, devolvé \"Sin iniciar\", nunca \"Crédito en trámite\". Para intencionCompraCategoria usá EXACTAMENTE una de: \"Menos de 3 meses\", \"3 a 6 meses\", \"En el año\", \"Sin definir\" (lo antes posible / ya / necesito mudarme ahora = \"Menos de 3 meses\"). No inventes: si un dato no aparece, devolvé \"NONE\" para los textos y 0 para el presupuesto. Si el usuario no dio método de pago, devolvé categoría \"Sin iniciar\"; si no dio intención, devolvé \"Sin definir\".",
+          "Sos un asistente de una inmobiliaria uruguaya. Extraé del último mensaje del usuario (usando el contexto) SOLO datos de calificación: operación (devolvé \"Venta\" si quiere comprar -comprar, comprarla, compra-, \"Alquiler\" si quiere alquilar -alquilar, rentar, alquilarla-), método de pago, intención de compra y presupuesto en USD. Interpretá el lenguaje natural del usuario y encasillalo directamente en la categoría fija que corresponda. Para metodoPago usá EXACTAMENTE una de: \"Efectivo listo\", \"Crédito hipotecario aprobado\", \"Crédito en trámite\", \"Sin iniciar\". Al contado / tengo la plata / en efectivo = \"Efectivo listo\". Crédito aprobado o preaprobado por el banco = \"Crédito hipotecario aprobado\". \"Crédito en trámite\" SOLO si la persona ya inició gestión activa con el banco y entregó documentación o está en evaluación. Si quiere crédito pero no entregó papeles, no inició trámite con el banco, está averiguando, o no lo definió, devolvé \"Sin iniciar\", nunca \"Crédito en trámite\". Para intencionCompra usá EXACTAMENTE una de: \"Menos de 3 meses\", \"3 a 6 meses\", \"En el año\", \"Sin definir\" (lo antes posible / ya / necesito mudarme ahora = \"Menos de 3 meses\"). No inventes: si el usuario no dio método de pago, devolvé \"Sin iniciar\"; si no dio intención, devolvé \"Sin definir\"; si no dio presupuesto, devolvé 0.",
         messages: [
           ...historyMessages,
           {
@@ -797,11 +758,9 @@ export const interpretAnswer = createServerFn({ method: "POST" })
 
       return {
         operacion: operacionDet ?? str(output.operacion),
-        metodoPagoTexto: str(output.metodoPagoTexto),
-        metodoPagoCategoria: catMetodoPago(output.metodoPagoCategoria),
+        metodoPago: catMetodoPago(output.metodoPago),
         presupuesto: num,
-        intencionCompraTexto: str(output.intencionCompraTexto),
-        intencionCompraCategoria: cat(output.intencionCompraCategoria, [
+        intencionCompra: cat(output.intencionCompra, [
           "Menos de 3 meses",
           "3 a 6 meses",
           "En el año",
