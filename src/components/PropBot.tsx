@@ -14,6 +14,7 @@ import { propertyImage } from "@/lib/propertyImage";
 import { sendLeadToSheet } from "@/lib/leadSheet";
 import { isAngryMessage, isAffirmative } from "@/lib/sentiment";
 import { mergeStoredLead } from "@/lib/leadStore";
+import { calcularLeadScore } from "@/lib/leadScore";
 import {
   createCalendarEvent,
   type CalendarSlot,
