@@ -22,7 +22,15 @@ export interface LeadRow {
   tipo: string;
   /** Presupuesto en USD (número o vacío). */
   presupuesto: number | "";
+  /**
+   * Columna "Intención de compra": recibe el TEXTO LITERAL que dijo el usuario
+   * (intencion_compra_texto), NO la categoría fija usada para el puntaje.
+   */
   intencionCompra: string;
+  /**
+   * Columna "Método de pago": recibe el TEXTO LITERAL que dijo el usuario
+   * (metodo_pago_texto), NO la categoría fija usada para el puntaje.
+   */
   metodoPago: string;
   operacion: string;
   propiedadInteres: string;

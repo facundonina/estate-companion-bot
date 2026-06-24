@@ -29,10 +29,11 @@ export interface BotLead {
 
 type LeadPatch = {
   operacion?: string;
-  financiamiento?: string;
+  metodoPagoTexto?: string;
+  metodoPagoCategoria?: string;
   presupuesto?: number;
-  urgencia?: string;
-  plazoCompra?: string;
+  intencionCompraTexto?: string;
+  intencionCompraCategoria?: string;
 };
 
 type QuickReply = { label: string; value: string; patch?: LeadPatch };
@@ -70,17 +71,26 @@ function detectQuickReplies(text: string): QuickReply[] | undefined {
       {
         label: "Contado",
         value: "Lo pago al contado",
-        patch: { financiamiento: "Efectivo listo" },
+        patch: {
+          metodoPagoTexto: "Lo pago al contado",
+          metodoPagoCategoria: "Efectivo listo",
+        },
       },
       {
         label: "Crédito ya aprobado",
         value: "Con crédito ya aprobado",
-        patch: { financiamiento: "Crédito hipotecario aprobado" },
+        patch: {
+          metodoPagoTexto: "Con crédito ya aprobado",
+          metodoPagoCategoria: "Crédito hipotecario aprobado",
+        },
       },
       {
         label: "Crédito en trámite",
         value: "Con crédito en trámite",
-        patch: { financiamiento: "Crédito en trámite" },
+        patch: {
+          metodoPagoTexto: "Con crédito en trámite",
+          metodoPagoCategoria: "Crédito en trámite",
+        },
       },
     ];
   }
@@ -96,17 +106,26 @@ function detectQuickReplies(text: string): QuickReply[] | undefined {
       {
         label: "Ya",
         value: "La necesito ya",
-        patch: { urgencia: "Menos de 3 meses" },
+        patch: {
+          intencionCompraTexto: "La necesito ya",
+          intencionCompraCategoria: "Menos de 3 meses",
+        },
       },
       {
         label: "En los próximos meses",
         value: "En los próximos meses",
-        patch: { urgencia: "3 a 6 meses" },
+        patch: {
+          intencionCompraTexto: "En los próximos meses",
+          intencionCompraCategoria: "3 a 6 meses",
+        },
       },
       {
         label: "Más adelante",
         value: "Más adelante",
-        patch: { urgencia: "Más adelante" },
+        patch: {
+          intencionCompraTexto: "Más adelante",
+          intencionCompraCategoria: "En el año",
+        },
       },
     ];
   }
@@ -157,20 +176,23 @@ interface BotLeadState extends BotLead {
   proposito?: string;
   piscina?: boolean;
   garage?: boolean;
-  urgencia?: string;
-  financiamiento?: string;
-  plazoCompra?: string;
+  // Método de pago: texto literal del usuario + categoría fija.
+  metodoPagoTexto?: string;
+  metodoPagoCategoria?: string;
+  // Intención de compra / plazo: texto literal del usuario + categoría fija.
+  intencionCompraTexto?: string;
+  intencionCompraCategoria?: string;
   prioridad?: string;
 }
 
 function calcPrioridad(lead: BotLeadState): string {
-  const financiamiento = lead.financiamiento || "";
-  const urgencia = lead.urgencia || "";
+  const categoria = lead.metodoPagoCategoria || "";
+  const intencion = lead.intencionCompraCategoria || "";
   const tieneDinero =
-    financiamiento === "Efectivo listo" ||
-    financiamiento === "Crédito hipotecario aprobado";
-  const urgenciaAlta = urgencia === "Menos de 3 meses";
-  const urgenciaMedia = urgencia === "3 a 6 meses";
+    categoria === "Efectivo listo" ||
+    categoria === "Crédito hipotecario aprobado";
+  const urgenciaAlta = intencion === "Menos de 3 meses";
+  const urgenciaMedia = intencion === "3 a 6 meses";
   if (tieneDinero && urgenciaAlta) return "Alta";
   if (tieneDinero && urgenciaMedia) return "Media";
   if (tieneDinero || urgenciaAlta) return "Media";
@@ -178,18 +200,22 @@ function calcPrioridad(lead: BotLeadState): string {
 }
 
 // Construye la fila de la planilla de Leads. El puntaje y la prioridad SIEMPRE
-// los calcula el sistema (computeLeadScore), nunca el modelo de Gemini.
+// los calcula el sistema (computeLeadScore) usando exclusivamente las CATEGORÍAS
+// fijas. En cambio, las columnas "Intención de compra" y "Método de pago" de la
+// planilla reciben el TEXTO LITERAL del usuario, no la categoría.
 function buildLeadRow(lead: BotLeadState, prop: Property): LeadRow {
-  const intencion = lead.urgencia || lead.plazoCompra || "";
-  const metodoPago = lead.financiamiento || "";
+  const intencionTexto =
+    lead.intencionCompraTexto || lead.intencionCompraCategoria || "";
+  const metodoPagoTexto =
+    lead.metodoPagoTexto || lead.metodoPagoCategoria || "";
   const operacion = lead.operacion || prop.operacion;
   const score = computeLeadScore({
     operacion,
     zona: lead.zona,
     tipo: lead.tipo,
     presupuesto: lead.presupuesto,
-    intencionCompra: intencion,
-    metodoPago,
+    intencionCompraCategoria: lead.intencionCompraCategoria,
+    metodoPagoCategoria: lead.metodoPagoCategoria,
     propiedadInteresId: prop.id,
     nombre: lead.nombre,
     telefono: lead.telefono,
@@ -203,8 +229,8 @@ function buildLeadRow(lead: BotLeadState, prop: Property): LeadRow {
     zona: lead.zona ?? "",
     tipo: lead.tipo ?? "",
     presupuesto: typeof lead.presupuesto === "number" ? lead.presupuesto : "",
-    intencionCompra: intencion,
-    metodoPago,
+    intencionCompra: intencionTexto,
+    metodoPago: metodoPagoTexto,
     operacion,
     propiedadInteres: `${prop.tipo} en ${prop.barrio}, ${prop.departamento} (#${prop.id})`,
     matchEnCatalogo: score.matchEnCatalogo ? "Sí" : "No",
@@ -220,9 +246,10 @@ function tieneDatosCalificacion(lead: BotLeadState): boolean {
   return Boolean(
     lead.operacion ||
       typeof lead.presupuesto === "number" ||
-      lead.urgencia ||
-      lead.plazoCompra ||
-      lead.financiamiento,
+      lead.intencionCompraTexto ||
+      lead.intencionCompraCategoria ||
+      lead.metodoPagoTexto ||
+      lead.metodoPagoCategoria,
   );
 }
 
@@ -276,8 +303,10 @@ export function PropBot({
 }: {
   property: Property;
   lead: BotLead & {
-    urgencia?: string;
-    financiamiento?: string;
+    metodoPagoTexto?: string;
+    metodoPagoCategoria?: string;
+    intencionCompraTexto?: string;
+    intencionCompraCategoria?: string;
     presupuesto?: number;
     prioridad?: string;
   };
@@ -342,7 +371,7 @@ export function PropBot({
     [],
   );
 
-  // Perfil acumulado del lead (financiación, presupuesto, urgencia, plazo).
+  // Perfil acumulado del lead (método de pago, presupuesto, intención de compra).
   const buildPerfil = useCallback(() => {
     const l = leadRef.current;
     return {
@@ -350,10 +379,11 @@ export function PropBot({
       operacion: l.operacion,
       ubicacion: l.zona,
       tipo: l.tipo,
-      urgencia: l.urgencia,
-      financiamiento: l.financiamiento,
+      metodoPagoTexto: l.metodoPagoTexto,
+      metodoPagoCategoria: l.metodoPagoCategoria,
+      intencionCompraTexto: l.intencionCompraTexto,
+      intencionCompraCategoria: l.intencionCompraCategoria,
       presupuesto: l.presupuesto,
-      plazoCompra: l.plazoCompra,
     };
   }, []);
 
@@ -424,44 +454,43 @@ export function PropBot({
   }, []);
 
   // Aplica al perfil un patch de calificación y lo persiste (no bloquea).
-  const applyPatch = useCallback(
-    (patch: {
-      operacion?: string;
-      financiamiento?: string;
-      presupuesto?: number;
-      urgencia?: string;
-      plazoCompra?: string;
-    }) => {
-      const l = leadRef.current;
-      let changed = false;
-      if (patch.operacion) {
-        l.operacion = patch.operacion;
-        changed = true;
-      }
-      if (patch.financiamiento) {
-        l.financiamiento = patch.financiamiento;
-        changed = true;
-      }
-      if (typeof patch.presupuesto === "number" && patch.presupuesto > 0) {
-        l.presupuesto = patch.presupuesto;
-        changed = true;
-      }
-      if (patch.urgencia) {
-        l.urgencia = patch.urgencia;
-        changed = true;
-      }
-      if (patch.plazoCompra) {
-        l.plazoCompra = patch.plazoCompra;
-        changed = true;
-      }
-      if (changed) {
-        l.prioridad = calcPrioridad(l);
-        mergeStoredLead({
-          urgencia: l.urgencia,
-          financiamiento: l.financiamiento,
-          presupuesto: l.presupuesto,
-          prioridad: l.prioridad,
-        });
+  const applyPatch = useCallback((patch: LeadPatch) => {
+    const l = leadRef.current;
+    let changed = false;
+    if (patch.operacion) {
+      l.operacion = patch.operacion;
+      changed = true;
+    }
+    if (patch.metodoPagoTexto) {
+      l.metodoPagoTexto = patch.metodoPagoTexto;
+      changed = true;
+    }
+    if (patch.metodoPagoCategoria) {
+      l.metodoPagoCategoria = patch.metodoPagoCategoria;
+      changed = true;
+    }
+    if (typeof patch.presupuesto === "number" && patch.presupuesto > 0) {
+      l.presupuesto = patch.presupuesto;
+      changed = true;
+    }
+    if (patch.intencionCompraTexto) {
+      l.intencionCompraTexto = patch.intencionCompraTexto;
+      changed = true;
+    }
+    if (patch.intencionCompraCategoria) {
+      l.intencionCompraCategoria = patch.intencionCompraCategoria;
+      changed = true;
+    }
+    if (changed) {
+      l.prioridad = calcPrioridad(l);
+      mergeStoredLead({
+        metodoPagoTexto: l.metodoPagoTexto,
+        metodoPagoCategoria: l.metodoPagoCategoria,
+        intencionCompraTexto: l.intencionCompraTexto,
+        intencionCompraCategoria: l.intencionCompraCategoria,
+        presupuesto: l.presupuesto,
+        prioridad: l.prioridad,
+      });
       }
     },
     [],
@@ -530,10 +559,11 @@ export function PropBot({
             // La operación solo se aplica desde una charla general; si ya hay
             // una propiedad puntual elegida, su operación manda (se fijó al abrir).
             operacion: patch.operacion ?? undefined,
-            financiamiento: patch.financiamiento ?? undefined,
+            metodoPagoTexto: patch.metodoPagoTexto ?? undefined,
+            metodoPagoCategoria: patch.metodoPagoCategoria ?? undefined,
             presupuesto: patch.presupuesto ?? undefined,
-            urgencia: patch.urgencia ?? undefined,
-            plazoCompra: patch.plazoCompra ?? undefined,
+            intencionCompraTexto: patch.intencionCompraTexto ?? undefined,
+            intencionCompraCategoria: patch.intencionCompraCategoria ?? undefined,
           });
         })
         .catch(() => {});

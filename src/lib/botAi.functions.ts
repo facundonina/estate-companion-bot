@@ -43,7 +43,9 @@ No repitas datos crudos de las herramientas:
 Nunca repitas en tu respuesta de texto el resultado crudo (JSON, array, ni ningún campo técnico) que te devuelve buscar_propiedades u obtener_detalle_propiedad. Esos datos siempre se muestran a través de la tarjeta visual de la propiedad. Tu respuesta en texto debe ser puramente conversacional — podés mencionar el nombre o la zona de la propiedad, pero nunca pegues el objeto de datos completo.
 
 Calificación del lead:
-Durante la conversación, identificá y guardá en el perfil del lead, vía actualizar_perfil_lead, estos campos a medida que vayan apareciendo: operación (si el usuario muestra interés en una propiedad puntual, la operación es la de esa propiedad y NO se la preguntes; solo preguntá si busca comprar o alquilar en charlas generales, cuando todavía no eligió ninguna propiedad puntual), zona, tipo de propiedad, presupuesto, intención de compra o plazo de mudanza, método de pago, y el ID de la propiedad puntual en la que el usuario mostró interés concreto entre los resultados de buscar_propiedades. El sistema registra al lead en la planilla automáticamente al final de la conversación (cuando se confirma la reunión o el usuario se despide); no tenés ninguna herramienta de registro, así que no intentes registrar nada vos mismo. Nunca calcules ni menciones vos mismo un puntaje o una categoría de prioridad — eso lo hace el sistema automáticamente, no es algo que tengas que decidir ni comunicar.`;
+Durante la conversación, identificá y guardá en el perfil del lead, vía actualizar_perfil_lead, estos campos a medida que vayan apareciendo: operación (si el usuario muestra interés en una propiedad puntual, la operación es la de esa propiedad y NO se la preguntes; solo preguntá si busca comprar o alquilar en charlas generales, cuando todavía no eligió ninguna propiedad puntual), zona, tipo de propiedad, presupuesto, intención de compra o plazo de mudanza, método de pago, y el ID de la propiedad puntual en la que el usuario mostró interés concreto entre los resultados de buscar_propiedades. El sistema registra al lead en la planilla automáticamente al final de la conversación (cuando se confirma la reunión o el usuario se despide); no tenés ninguna herramienta de registro, así que no intentes registrar nada vos mismo. Nunca calcules ni menciones vos mismo un puntaje o una categoría de prioridad — eso lo hace el sistema automáticamente, no es algo que tengas que decidir ni comunicar.
+
+Cuando el usuario te diga cómo piensa pagar o para cuándo necesita la propiedad, guardá tanto su frase literal como la categoría que mejor corresponda de la lista fija, interpretando sinónimos naturales (por ejemplo, al contado, tengo la plata, o en efectivo equivalen a Efectivo listo; lo antes posible, ya, o necesito mudarme ahora equivalen a Menos de 3 meses). Nunca dejes la categoría sin asignar si el usuario dio una respuesta que claramente corresponde a alguna de las cuatro opciones.`;
 
 // Reglas de salida para la burbuja de chat.
 const STYLE_RULES = `Reglas de salida:
@@ -160,10 +162,11 @@ export type BotAction =
       type: "actualizar_perfil_lead";
       patch: {
         operacion?: string;
-        financiamiento?: string;
+        metodoPagoTexto?: string;
+        metodoPagoCategoria?: string;
         presupuesto?: number;
-        urgencia?: string;
-        plazoCompra?: string;
+        intencionCompraTexto?: string;
+        intencionCompraCategoria?: string;
       };
     }
   | { type: "agendar_reunion"; slots: CalendarSlot[] };
@@ -178,10 +181,13 @@ const perfilSchema = z.object({
   operacion: z.string().max(40).optional(),
   ubicacion: z.string().max(120).optional(),
   tipo: z.string().max(60).optional(),
-  urgencia: z.string().max(120).optional(),
-  financiamiento: z.string().max(120).optional(),
+  // Método de pago: texto literal del usuario + categoría fija.
+  metodoPagoTexto: z.string().max(200).optional(),
+  metodoPagoCategoria: z.string().max(60).optional(),
+  // Intención de compra / plazo: texto literal del usuario + categoría fija.
+  intencionCompraTexto: z.string().max(200).optional(),
+  intencionCompraCategoria: z.string().max(60).optional(),
   presupuesto: z.number().optional(),
-  plazoCompra: z.string().max(120).optional(),
 });
 
 type PerfilLead = z.infer<typeof perfilSchema>;
@@ -193,9 +199,13 @@ function camposFaltantesParaAgendar(perfil: PerfilLead): string[] {
   if (!perfil.operacion) faltan.push("operación (compra o alquiler)");
   if (typeof perfil.presupuesto !== "number" || perfil.presupuesto <= 0)
     faltan.push("presupuesto");
-  if (!perfil.urgencia && !perfil.plazoCompra)
+  if (
+    !perfil.intencionCompraCategoria ||
+    perfil.intencionCompraCategoria === "Sin definir"
+  )
     faltan.push("intención de compra o plazo de mudanza");
-  if (!perfil.financiamiento) faltan.push("método de pago");
+  if (!perfil.metodoPagoCategoria || perfil.metodoPagoCategoria === "No definido")
+    faltan.push("método de pago");
   return faltan;
 }
 
@@ -326,7 +336,7 @@ export const chatWithBot = createServerFn({ method: "POST" })
         // -------------------------------------------------------------------
         actualizar_perfil_lead: tool({
           description:
-            "Guarda los datos de calificación que van apareciendo en la charla (operación, financiación, presupuesto, urgencia, plazo de compra). Llamala apenas detectes alguno de estos datos. Corre en segundo plano: no bloquea ni demora tu respuesta.",
+            "Guarda los datos de calificación que van apareciendo en la charla (operación, método de pago, presupuesto, intención de compra). Llamala apenas detectes alguno de estos datos. Corre en segundo plano: no bloquea ni demora tu respuesta.",
           inputSchema: z.object({
             operacion: z
               .enum(["Venta", "Alquiler"])
@@ -334,37 +344,60 @@ export const chatWithBot = createServerFn({ method: "POST" })
               .describe(
                 "Operación que busca el usuario: 'Venta' si quiere comprar, 'Alquiler' si quiere alquilar.",
               ),
-            financiacion: z
+            metodo_pago_texto: z
               .string()
               .optional()
-              .describe("Cómo planea financiar (contado, crédito, etc.)"),
+              .describe(
+                "El texto literal que dijo el usuario sobre cómo piensa pagar, tal cual lo escribió o algo muy cercano.",
+              ),
+            metodo_pago_categoria: z
+              .enum([
+                "Efectivo listo",
+                "Crédito hipotecario aprobado",
+                "Crédito en trámite",
+                "No definido",
+              ])
+              .optional()
+              .describe(
+                "La categoría fija de método de pago que mejor corresponde a lo que dijo el usuario.",
+              ),
             presupuesto: z
               .number()
               .optional()
               .describe("Presupuesto aproximado en USD"),
-            urgencia: z
+            intencion_compra_texto: z
               .string()
               .optional()
-              .describe("Qué tan urgente es la compra"),
-            plazoCompra: z
-              .string()
+              .describe(
+                "El texto literal que dijo el usuario sobre para cuándo necesita la propiedad, tal cual lo escribió o algo muy cercano.",
+              ),
+            intencion_compra_categoria: z
+              .enum(["Menos de 3 meses", "3 a 6 meses", "En el año", "Sin definir"])
               .optional()
-              .describe("En cuánto tiempo planea comprar"),
+              .describe(
+                "La categoría fija de intención de compra / plazo de mudanza que mejor corresponde a lo que dijo el usuario.",
+              ),
           }),
           execute: async (patch) => {
             const clean: {
               operacion?: string;
-              financiamiento?: string;
+              metodoPagoTexto?: string;
+              metodoPagoCategoria?: string;
               presupuesto?: number;
-              urgencia?: string;
-              plazoCompra?: string;
+              intencionCompraTexto?: string;
+              intencionCompraCategoria?: string;
             } = {};
             if (patch.operacion) clean.operacion = patch.operacion;
-            if (patch.financiacion) clean.financiamiento = patch.financiacion;
+            if (patch.metodo_pago_texto)
+              clean.metodoPagoTexto = patch.metodo_pago_texto;
+            if (patch.metodo_pago_categoria)
+              clean.metodoPagoCategoria = patch.metodo_pago_categoria;
             if (typeof patch.presupuesto === "number" && patch.presupuesto > 0)
               clean.presupuesto = Math.round(patch.presupuesto);
-            if (patch.urgencia) clean.urgencia = patch.urgencia;
-            if (patch.plazoCompra) clean.plazoCompra = patch.plazoCompra;
+            if (patch.intencion_compra_texto)
+              clean.intencionCompraTexto = patch.intencion_compra_texto;
+            if (patch.intencion_compra_categoria)
+              clean.intencionCompraCategoria = patch.intencion_compra_categoria;
             actions.push({ type: "actualizar_perfil_lead", patch: clean });
             return { ok: true };
           },
@@ -436,12 +469,15 @@ export const chatWithBot = createServerFn({ method: "POST" })
         p.operacion ? `operación: ${p.operacion}` : null,
         p.ubicacion ? `ubicación de interés: ${p.ubicacion}` : null,
         p.tipo ? `tipo de interés: ${p.tipo}` : null,
-        p.financiamiento ? `financiación: ${p.financiamiento}` : null,
+        p.metodoPagoTexto
+          ? `método de pago: ${p.metodoPagoTexto}${p.metodoPagoCategoria ? ` (${p.metodoPagoCategoria})` : ""}`
+          : null,
         typeof p.presupuesto === "number"
           ? `presupuesto: USD ${p.presupuesto.toLocaleString("es-UY")}`
           : null,
-        p.urgencia ? `urgencia: ${p.urgencia}` : null,
-        p.plazoCompra ? `plazo de compra: ${p.plazoCompra}` : null,
+        p.intencionCompraTexto
+          ? `intención de compra: ${p.intencionCompraTexto}${p.intencionCompraCategoria ? ` (${p.intencionCompraCategoria})` : ""}`
+          : null,
       ].filter(Boolean);
       contextLines.push(
         perfilLines.length
@@ -577,16 +613,19 @@ export const generateBotMessage = createServerFn({ method: "POST" })
 
 // ===========================================================================
 // interpretAnswer: extracción NO bloqueante. Su único rol es extraer datos de
-// calificación (financiación, presupuesto, urgencia, plazo) del mensaje del
-// usuario para alimentar actualizar_perfil_lead. Ya NO decide si se repite una
-// pregunta ni controla el flujo. Devuelve siempre un objeto seguro.
+// calificación (método de pago, presupuesto, intención de compra) del mensaje
+// del usuario para alimentar actualizar_perfil_lead. Ya NO decide si se repite
+// una pregunta ni controla el flujo. Devuelve siempre un objeto seguro.
+// Para método de pago e intención de compra devuelve tanto el texto literal
+// como la categoría fija (la misma lista que usa la tool y el scoring).
 // ===========================================================================
 export interface ProfilePatch {
   operacion: string | null;
-  financiamiento: string | null;
+  metodoPagoTexto: string | null;
+  metodoPagoCategoria: string | null;
   presupuesto: number | null;
-  urgencia: string | null;
-  plazoCompra: string | null;
+  intencionCompraTexto: string | null;
+  intencionCompraCategoria: string | null;
 }
 
 const interpretInputSchema = z.object({
@@ -610,10 +649,11 @@ export const interpretAnswer = createServerFn({ method: "POST" })
     const operacionDet = mapOperacion(data.message);
     const empty: ProfilePatch = {
       operacion: operacionDet,
-      financiamiento: null,
+      metodoPagoTexto: null,
+      metodoPagoCategoria: null,
       presupuesto: null,
-      urgencia: null,
-      plazoCompra: null,
+      intencionCompraTexto: null,
+      intencionCompraCategoria: null,
     };
 
     try {
@@ -637,14 +677,15 @@ export const interpretAnswer = createServerFn({ method: "POST" })
         output: Output.object({
           schema: z.object({
             operacion: z.string(),
-            financiamiento: z.string(),
+            metodoPagoTexto: z.string(),
+            metodoPagoCategoria: z.string(),
             presupuesto: z.number(),
-            urgencia: z.string(),
-            plazoCompra: z.string(),
+            intencionCompraTexto: z.string(),
+            intencionCompraCategoria: z.string(),
           }),
         }),
         system:
-          "Sos un asistente de una inmobiliaria uruguaya. Extraé del último mensaje del usuario (usando el contexto) SOLO datos de calificación: operación (devolvé \"Venta\" si quiere comprar -comprar, comprarla, compra-, \"Alquiler\" si quiere alquilar -alquilar, rentar, alquilarla-), financiación (cómo paga), presupuesto en USD, urgencia y plazo de compra. No inventes: si un dato no aparece, devolvé \"NONE\" para los textos y 0 para el presupuesto.",
+          "Sos un asistente de una inmobiliaria uruguaya. Extraé del último mensaje del usuario (usando el contexto) SOLO datos de calificación: operación (devolvé \"Venta\" si quiere comprar -comprar, comprarla, compra-, \"Alquiler\" si quiere alquilar -alquilar, rentar, alquilarla-), método de pago y intención de compra (para cada uno devolvé DOS valores: el texto literal que dijo el usuario, y la categoría fija que mejor corresponda) y presupuesto en USD. Para metodoPagoCategoria usá EXACTAMENTE una de: \"Efectivo listo\", \"Crédito hipotecario aprobado\", \"Crédito en trámite\", \"No definido\" (al contado / tengo la plata / en efectivo = \"Efectivo listo\"). Para intencionCompraCategoria usá EXACTAMENTE una de: \"Menos de 3 meses\", \"3 a 6 meses\", \"En el año\", \"Sin definir\" (lo antes posible / ya / necesito mudarme ahora = \"Menos de 3 meses\"). No inventes: si un dato no aparece, devolvé \"NONE\" para los textos y 0 para el presupuesto. Si el usuario no dio método de pago, devolvé categoría \"No definido\"; si no dio intención, devolvé \"Sin definir\".",
         messages: [
           ...historyMessages,
           {
@@ -659,6 +700,11 @@ export const interpretAnswer = createServerFn({ method: "POST" })
         const s = typeof v === "string" ? v.trim() : "";
         return s && s.toUpperCase() !== "NONE" ? s : null;
       };
+      // Solo aceptamos categorías que pertenezcan a la lista fija.
+      const cat = (v: unknown, allowed: string[]) => {
+        const s = str(v);
+        return s && allowed.includes(s) ? s : null;
+      };
       const num =
         typeof output.presupuesto === "number" && output.presupuesto > 0
           ? Math.round(output.presupuesto)
@@ -666,10 +712,21 @@ export const interpretAnswer = createServerFn({ method: "POST" })
 
       return {
         operacion: operacionDet ?? str(output.operacion),
-        financiamiento: str(output.financiamiento),
+        metodoPagoTexto: str(output.metodoPagoTexto),
+        metodoPagoCategoria: cat(output.metodoPagoCategoria, [
+          "Efectivo listo",
+          "Crédito hipotecario aprobado",
+          "Crédito en trámite",
+          "No definido",
+        ]),
         presupuesto: num,
-        urgencia: str(output.urgencia),
-        plazoCompra: str(output.plazoCompra),
+        intencionCompraTexto: str(output.intencionCompraTexto),
+        intencionCompraCategoria: cat(output.intencionCompraCategoria, [
+          "Menos de 3 meses",
+          "3 a 6 meses",
+          "En el año",
+          "Sin definir",
+        ]),
       };
 
     } catch (err) {

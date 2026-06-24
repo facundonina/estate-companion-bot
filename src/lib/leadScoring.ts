@@ -12,10 +12,18 @@ export interface LeadProfileForScoring {
   zona?: string;
   tipo?: string;
   presupuesto?: number;
-  /** Intención de compra / plazo de mudanza */
-  intencionCompra?: string;
-  /** Método de pago */
-  metodoPago?: string;
+  /**
+   * Categoría fija de intención de compra / plazo de mudanza:
+   * "Menos de 3 meses" | "3 a 6 meses" | "En el año" | "Sin definir".
+   * El puntaje SOLO usa esta categoría, nunca el texto literal del usuario.
+   */
+  intencionCompraCategoria?: string;
+  /**
+   * Categoría fija de método de pago:
+   * "Efectivo listo" | "Crédito hipotecario aprobado" | "Crédito en trámite" | "No definido".
+   * El puntaje SOLO usa esta categoría, nunca el texto literal del usuario.
+   */
+  metodoPagoCategoria?: string;
   /** ID de la propiedad puntual de interés, si la hay */
   propiedadInteresId?: number;
   nombre?: string;
@@ -151,8 +159,8 @@ export function computeLeadScore(
     return { puntaje: 0, prioridad: "Baja", matchEnCatalogo: match, esVenta };
   }
 
-  const pIntencion = puntosIntencion(perfil.intencionCompra);
-  const pPago = puntosMetodoPago(perfil.metodoPago);
+  const pIntencion = puntosIntencion(perfil.intencionCompraCategoria);
+  const pPago = puntosMetodoPago(perfil.metodoPagoCategoria);
   const pMatch = match ? 2 : 0;
 
   // Completitud: teléfono + email válidos y presupuesto/intención/pago
@@ -169,7 +177,7 @@ export function computeLeadScore(
   const puntaje = pIntencion + pPago + pMatch + pCompletitud; // 0–9
 
   let prioridad: "Alta" | "Media" | "Baja";
-  if (plataDisponible(perfil.metodoPago)) {
+  if (plataDisponible(perfil.metodoPagoCategoria)) {
     // Plata disponible (efectivo o crédito hipotecario aprobado) => Alta directo.
     prioridad = "Alta";
   } else if (puntaje >= 6) prioridad = "Alta";
