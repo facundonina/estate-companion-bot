@@ -562,10 +562,6 @@ export function PropBot({
         `¡Hola ${firstName(lead.nombre)}! Soy tu asesor para esta propiedad. ¿Te interesa avanzar con esta propiedad o tenés alguna duda primero?`,
         {
           card: property,
-          quickReplies: [
-            { label: "Me interesa", value: "Me interesa esta propiedad" },
-            { label: "Tengo una duda", value: "Tengo una duda" },
-          ],
         },
         650,
       );
