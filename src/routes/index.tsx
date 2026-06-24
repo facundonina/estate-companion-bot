@@ -38,7 +38,11 @@ function Index() {
     .slice(0, 6);
 
   const total = properties.length;
-  const minPrice = Math.min(...properties.map((p) => p.precio));
+  const minPrice = Math.min(
+    ...properties
+      .filter((p) => p.operacion !== "Alquiler")
+      .map((p) => p.precio),
+  );
   const [chatOpen, setChatOpen] = useState(false);
 
   return (
