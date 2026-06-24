@@ -54,6 +54,16 @@ function firstName(n: string) {
   return (n || "").split(" ")[0] || "";
 }
 
+function isExplicitNegative(raw: string): boolean {
+  const t = raw
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+  return /^(no|nop|nah|negativo)(\b|[,.!])/.test(t) ||
+    /\b(no me interesa|no quiero|por ahora no|prefiero que no)\b/.test(t);
+}
+
 
 
 function scoreProp(p: Property, lead: BotLeadState): number {
@@ -90,17 +100,17 @@ interface BotLeadState extends BotLead {
 }
 
 function calcPrioridad(lead: BotLeadState): string {
-  const categoria = lead.metodoPagoCategoria || "";
-  const intencion = lead.intencionCompraCategoria || "";
-  const tieneDinero =
-    categoria === "Efectivo listo" ||
-    categoria === "Crédito hipotecario aprobado";
-  const urgenciaAlta = intencion === "Menos de 3 meses";
-  const urgenciaMedia = intencion === "3 a 6 meses";
-  if (tieneDinero && urgenciaAlta) return "Alta";
-  if (tieneDinero && urgenciaMedia) return "Media";
-  if (tieneDinero || urgenciaAlta) return "Media";
-  return "Baja";
+  return computeLeadScore({
+    operacion: lead.operacion,
+    zona: lead.zona,
+    tipo: lead.tipo,
+    presupuesto: lead.presupuesto,
+    intencionCompraCategoria: lead.intencionCompraCategoria,
+    metodoPagoCategoria: lead.metodoPagoCategoria,
+    nombre: lead.nombre,
+    telefono: lead.telefono,
+    email: lead.email,
+  }).prioridad;
 }
 
 // Construye la fila de la planilla de Leads. El puntaje y la prioridad SIEMPRE
@@ -600,7 +610,7 @@ export function PropBot({
       // Modo secundario: confirmación de avanzar por esta propiedad.
       if (secondaryConfirmRef.current) {
         secondaryConfirmRef.current = false;
-        if (!isAffirmative(text)) {
+        if (isExplicitNegative(text)) {
           await botReply(
             {
               text: "¡Sin problema! Cualquier cosa que necesites, estoy por acá. 😊",
