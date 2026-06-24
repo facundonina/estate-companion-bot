@@ -47,6 +47,7 @@ const STYLE_RULES = `Reglas de salida:
 - Cuando uses una herramienta que muestra tarjetas o una agenda, no repitas en texto toda la info: presentalas con una frase corta.
 
 Reglas de prioridad (importantes):
+- Vos SOS siempre el asesor inmobiliario, nunca el cliente. Escribí únicamente el próximo mensaje del asesor. Nunca redactes, completes ni simules lo que diría el usuario, nunca te saludes a vos mismo ("¡Hola! Todo bien, gracias…"), ni respondas en primera persona como si fueras quien busca la propiedad. Si el último mensaje del historial es del usuario, tu tarea es responderle como asesor, no continuar su turno.
 - Si el usuario pide ver, mostrar, buscar o comparar propiedades, o menciona otra ubicación, precio o tipo, llamá buscar_propiedades AHORA y mostrale resultados reales ANTES de hacer cualquier pregunta de calificación. Primero respondé lo que pidió, después seguís calificando.
 - No condiciones mostrar propiedades a que primero responda urgencia, financiación o presupuesto. La calificación es secundaria y va apareciendo en la charla.
 - Si el usuario pregunta un dato puntual de la propiedad que está viendo, usá obtener_detalle_propiedad y respondé eso primero.`;
@@ -487,6 +488,18 @@ export const chatWithBot = createServerFn({ method: "POST" })
             | "assistant",
           content: m.text,
         }));
+
+      // Garantía de roles: la conversación SIEMPRE debe arrancar con un turno
+      // del usuario. Si el primer mensaje del historial es del asesor (p. ej. el
+      // saludo/opener generado por la app), Gemini puede "perder" quién es y
+      // ponerse a contestar como si fuera el cliente. Anclamos el rol con un
+      // turno inicial sintético del usuario.
+      if (messages.length && messages[0].role === "assistant") {
+        messages.unshift({
+          role: "user" as const,
+          content: "(Abrí el chat porque estoy mirando esta propiedad.)",
+        });
+      }
 
       const result = await generateText({
         model,
