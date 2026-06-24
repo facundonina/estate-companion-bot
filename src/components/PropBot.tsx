@@ -11,7 +11,8 @@ import { Building2, Send, Calendar, Bath, BedDouble, Maximize, ArrowRight } from
 import { properties, type Property } from "@/data/properties";
 import { formatPrice } from "@/lib/format";
 import { propertyImage } from "@/lib/propertyImage";
-import { sendLeadToSheet } from "@/lib/leadSheet";
+import { sendLeadRow, type LeadRow } from "@/lib/leadSheet";
+import { computeLeadScore } from "@/lib/leadScoring";
 import { isAngryMessage, isAffirmative } from "@/lib/sentiment";
 import { mergeStoredLead } from "@/lib/leadStore";
 import {
