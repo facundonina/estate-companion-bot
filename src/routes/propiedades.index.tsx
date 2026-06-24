@@ -60,6 +60,7 @@ function PropiedadesPage() {
 
   const filtered = properties.filter((p) => {
     if (search.tipo && p.tipo !== search.tipo) return false;
+    if (search.operacion && p.operacion !== search.operacion) return false;
     if (search.departamento && p.departamento !== search.departamento)
       return false;
     if (search.dormitorios && p.dormitorios < search.dormitorios) return false;
@@ -72,7 +73,7 @@ function PropiedadesPage() {
   });
 
   const hasFilters =
-    search.q || search.tipo || search.departamento || search.dormitorios || search.precioMax;
+    search.q || search.tipo || search.operacion || search.departamento || search.dormitorios || search.precioMax;
 
   return (
     <div className="min-h-screen bg-background">
