@@ -92,27 +92,38 @@ function calcPrioridad(lead: BotLeadState): string {
   return "Baja";
 }
 
-// Construye el payload para Google Sheets incluyendo la propiedad puntual
-// que está consultando el lead, para que el vendedor sepa por cuál se interesó.
-function leadPayload(lead: BotLeadState, prop: Property) {
-  const origin =
-    typeof window !== "undefined" ? window.location.origin : "";
-  return {
+// Construye la fila de la planilla de Leads. El puntaje y la prioridad SIEMPRE
+// los calcula el sistema (computeLeadScore), nunca el modelo de Gemini.
+function buildLeadRow(lead: BotLeadState, prop: Property): LeadRow {
+  const intencion = lead.urgencia || lead.plazoCompra || "";
+  const metodoPago = lead.financiamiento || "";
+  const score = computeLeadScore({
+    operacion: prop.operacion,
+    zona: lead.zona,
+    tipo: lead.tipo,
+    presupuesto: lead.presupuesto,
+    intencionCompra: intencion,
+    metodoPago,
+    propiedadInteresId: prop.id,
     nombre: lead.nombre,
     telefono: lead.telefono,
     email: lead.email,
-    mensaje: lead.mensaje,
-    zona: lead.zona,
-    tipo: lead.tipo,
-    dormitorios: lead.dormitorios,
-    presupuesto: lead.presupuesto,
-    proposito: lead.proposito,
-    urgencia: lead.urgencia,
-    financiamiento: lead.financiamiento,
-    prioridad: lead.prioridad,
-    propiedad: `${prop.tipo} en ${prop.barrio}, ${prop.departamento}`,
-    propiedadId: prop.id,
-    propiedadLink: `${origin}/propiedades/${prop.id}`,
+  });
+  return {
+    fecha: new Date().toISOString(),
+    nombre: lead.nombre ?? "",
+    telefono: lead.telefono ?? "",
+    email: lead.email ?? "",
+    zona: lead.zona ?? "",
+    tipo: lead.tipo ?? "",
+    presupuesto: typeof lead.presupuesto === "number" ? lead.presupuesto : "",
+    intencionCompra: intencion,
+    metodoPago,
+    operacion: prop.operacion,
+    propiedadInteres: `${prop.tipo} en ${prop.barrio}, ${prop.departamento} (#${prop.id})`,
+    matchEnCatalogo: score.matchEnCatalogo ? "Sí" : "No",
+    puntaje: score.puntaje,
+    prioridad: score.prioridad,
   };
 }
 
