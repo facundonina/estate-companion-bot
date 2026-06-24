@@ -408,6 +408,7 @@ export const chatWithBot = createServerFn({ method: "POST" })
       const p = data.perfil;
       const perfilLines = [
         p.nombre ? `nombre: ${p.nombre}` : null,
+        p.operacion ? `operación: ${p.operacion}` : null,
         p.ubicacion ? `ubicación de interés: ${p.ubicacion}` : null,
         p.tipo ? `tipo de interés: ${p.tipo}` : null,
         p.financiamiento ? `financiación: ${p.financiamiento}` : null,
@@ -421,6 +422,12 @@ export const chatWithBot = createServerFn({ method: "POST" })
         perfilLines.length
           ? `Perfil acumulado del lead: ${perfilLines.join("; ")}.`
           : "Perfil del lead: todavía no hay datos de calificación.",
+      );
+      const faltanParaAgendar = camposFaltantesParaAgendar(p);
+      contextLines.push(
+        faltanParaAgendar.length
+          ? `Faltan datos para poder agendar una visita: ${faltanParaAgendar.join(", ")}. No ofrezcas ni confirmes una visita hasta tenerlos todos.`
+          : "El lead ya está calificado: si confirma interés concreto, podés ofrecer agendar una visita.",
       );
 
       const messages = data.history
