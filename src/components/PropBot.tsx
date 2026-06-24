@@ -11,7 +11,8 @@ import { Building2, Send, Calendar, Bath, BedDouble, Maximize, ArrowRight } from
 import { properties, type Property } from "@/data/properties";
 import { formatPrice } from "@/lib/format";
 import { propertyImage } from "@/lib/propertyImage";
-import { sendLeadToSheet } from "@/lib/leadSheet";
+import { sendLeadRow, type LeadRow } from "@/lib/leadSheet";
+import { computeLeadScore } from "@/lib/leadScoring";
 import { isAngryMessage, isAffirmative } from "@/lib/sentiment";
 import { mergeStoredLead } from "@/lib/leadStore";
 import {
@@ -91,27 +92,38 @@ function calcPrioridad(lead: BotLeadState): string {
   return "Baja";
 }
 
-// Construye el payload para Google Sheets incluyendo la propiedad puntual
-// que está consultando el lead, para que el vendedor sepa por cuál se interesó.
-function leadPayload(lead: BotLeadState, prop: Property) {
-  const origin =
-    typeof window !== "undefined" ? window.location.origin : "";
-  return {
+// Construye la fila de la planilla de Leads. El puntaje y la prioridad SIEMPRE
+// los calcula el sistema (computeLeadScore), nunca el modelo de Gemini.
+function buildLeadRow(lead: BotLeadState, prop: Property): LeadRow {
+  const intencion = lead.urgencia || lead.plazoCompra || "";
+  const metodoPago = lead.financiamiento || "";
+  const score = computeLeadScore({
+    operacion: prop.operacion,
+    zona: lead.zona,
+    tipo: lead.tipo,
+    presupuesto: lead.presupuesto,
+    intencionCompra: intencion,
+    metodoPago,
+    propiedadInteresId: prop.id,
     nombre: lead.nombre,
     telefono: lead.telefono,
     email: lead.email,
-    mensaje: lead.mensaje,
-    zona: lead.zona,
-    tipo: lead.tipo,
-    dormitorios: lead.dormitorios,
-    presupuesto: lead.presupuesto,
-    proposito: lead.proposito,
-    urgencia: lead.urgencia,
-    financiamiento: lead.financiamiento,
-    prioridad: lead.prioridad,
-    propiedad: `${prop.tipo} en ${prop.barrio}, ${prop.departamento}`,
-    propiedadId: prop.id,
-    propiedadLink: `${origin}/propiedades/${prop.id}`,
+  });
+  return {
+    fecha: new Date().toISOString(),
+    nombre: lead.nombre ?? "",
+    telefono: lead.telefono ?? "",
+    email: lead.email ?? "",
+    zona: lead.zona ?? "",
+    tipo: lead.tipo ?? "",
+    presupuesto: typeof lead.presupuesto === "number" ? lead.presupuesto : "",
+    intencionCompra: intencion,
+    metodoPago,
+    operacion: prop.operacion,
+    propiedadInteres: `${prop.tipo} en ${prop.barrio}, ${prop.departamento} (#${prop.id})`,
+    matchEnCatalogo: score.matchEnCatalogo ? "Sí" : "No",
+    puntaje: score.puntaje,
+    prioridad: score.prioridad,
   };
 }
 
@@ -399,13 +411,17 @@ export function PropBot({
             extra.agenda = true;
             agendaShown = true;
           }
+        } else if (a.type === "registrar_lead") {
+          // El servidor ya calculó el puntaje y escribió la fila en el Sheet.
+          leadSentRef.current = true;
         }
       }
 
-      // Si el modelo ofreció agendar, el lead califica: lo enviamos al Sheet.
+      // Fallback: si el modelo ofreció agendar pero no llamó a registrar_lead,
+      // escribimos el lead desde el cliente (puntaje calculado por el sistema).
       if (agendaShown && !leadSentRef.current) {
         leadSentRef.current = true;
-        void sendLeadToSheet(leadPayload(leadRef.current, activePropRef.current));
+        void sendLeadRow(buildLeadRow(leadRef.current, activePropRef.current));
       }
 
       const text =

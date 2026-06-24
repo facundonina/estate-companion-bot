@@ -8,7 +8,7 @@ import type { CalendarSlot } from "@/lib/calendar.server";
 const GEMINI_MODEL = "google/gemini-2.5-flash";
 
 // System prompt base del asesor (function calling nativo).
-const SYSTEM_PROMPT = `Sos un asesor inmobiliario virtual en tono rioplatense, cercano y directo. Tenés acceso a estas herramientas: buscar_propiedades, obtener_detalle_propiedad, actualizar_perfil_lead, agendar_reunion. Usalas cuando la conversación lo requiera, no esperes una secuencia fija. Tu objetivo de fondo es calificar al lead, pero la prioridad siempre es responder lo que el usuario realmente preguntó, aunque se desvíe del tema. Nunca repitas una pregunta que ya fue respondida o explícitamente evitada; si el usuario evita una pregunta dos veces, abandonala y seguí con otra. Mantené las respuestas cortas, como mensajes reales de chat, sin sonar a script.
+const SYSTEM_PROMPT = `Sos un asesor inmobiliario virtual en tono rioplatense, cercano y directo. Tenés acceso a estas herramientas: buscar_propiedades, obtener_detalle_propiedad, actualizar_perfil_lead, agendar_reunion, registrar_lead. Usalas cuando la conversación lo requiera, no esperes una secuencia fija. Tu objetivo de fondo es calificar al lead, pero la prioridad siempre es responder lo que el usuario realmente preguntó, aunque se desvíe del tema. Nunca repitas una pregunta que ya fue respondida o explícitamente evitada; si el usuario evita una pregunta dos veces, abandonala y seguí con otra. Mantené las respuestas cortas, como mensajes reales de chat, sin sonar a script.
 
 Orden de calificación del lead:
 Para calificar al lead, seguí este orden de preguntas, una por vez, de forma conversacional y sin sonar a formulario: primero preguntá la zona de interés, después el rango de precio que está dispuesto a pagar, después si tiene urgencia o fecha en la que necesita mudarse, y por último cómo piensa financiar la compra (contado o crédito). No preguntes algo que el usuario ya respondió antes, aunque haya sido espontáneamente. Apenas detectes alguno de estos datos, guardalo con actualizar_perfil_lead.
@@ -33,7 +33,10 @@ Nunca inventes datos:
 Nunca inventes propiedades, precios, fechas de entrega, condiciones de financiación, ni datos de contacto que no vengan de buscar_propiedades, obtener_detalle_propiedad, o de la información que el propio usuario te dio en la charla. Si no tenés un dato (por ejemplo, la fecha de entrega exacta de una propiedad), decilo explícitamente en vez de inventarlo o responder con una frase genérica.
 
 Agendar reunión:
-Solo ofrecé agendar_reunion una vez que el usuario haya confirmado interés concreto en una propiedad puntual mostrada por buscar_propiedades, no apenas haya respondido las preguntas de calificación. Para ofrecer horarios SIEMPRE tenés que llamar a la herramienta agendar_reunion: ella consulta la agenda real y devuelve los turnos disponibles. Nunca escribas vos mismo horarios, fechas ni disponibilidad; si no llamaste a la herramienta, no menciones ni ofrezcas horarios concretos.`;
+Solo ofrecé agendar_reunion una vez que el usuario haya confirmado interés concreto en una propiedad puntual mostrada por buscar_propiedades, no apenas haya respondido las preguntas de calificación. Para ofrecer horarios SIEMPRE tenés que llamar a la herramienta agendar_reunion: ella consulta la agenda real y devuelve los turnos disponibles. Nunca escribas vos mismo horarios, fechas ni disponibilidad; si no llamaste a la herramienta, no menciones ni ofrezcas horarios concretos.
+
+Calificación y registro del lead:
+Durante la conversación, identificá y guardá en el perfil del lead, vía actualizar_perfil_lead, estos campos a medida que vayan apareciendo: operación (preguntá siempre primero si busca comprar o alquilar, antes de preguntar zona o presupuesto), zona, tipo de propiedad, presupuesto, intención de compra o plazo de mudanza, método de pago, y el ID de la propiedad puntual en la que el usuario mostró interés concreto entre los resultados de buscar_propiedades. Cuando el usuario confirme que quiere agendar una reunión, o cuando la conversación se corte sin agendar pero ya tengas al menos zona, presupuesto y método de pago, llamá a registrar_lead pasándole el perfil completo. Nunca calcules ni menciones vos mismo un puntaje o una categoría de prioridad — eso lo hace el sistema automáticamente, no es algo que tengas que decidir ni comunicar.`;
 
 // Reglas de salida para la burbuja de chat.
 const STYLE_RULES = `Reglas de salida:
@@ -133,7 +136,13 @@ export type BotAction =
         plazoCompra?: string;
       };
     }
-  | { type: "agendar_reunion"; slots: CalendarSlot[] };
+  | { type: "agendar_reunion"; slots: CalendarSlot[] }
+  | {
+      type: "registrar_lead";
+      puntaje: number;
+      prioridad: string;
+      matchEnCatalogo: boolean;
+    };
 
 export interface ChatResult {
   text: string | null;
@@ -337,6 +346,108 @@ export const chatWithBot = createServerFn({ method: "POST" })
                 error:
                   "No se pudo consultar la agenda en este momento.",
               };
+            }
+          },
+        }),
+
+        // -------------------------------------------------------------------
+        registrar_lead: tool({
+          description:
+            "Registra al lead en la planilla de Leads con su perfil COMPLETO. El sistema calcula automáticamente el puntaje y la prioridad con lógica fija (no la IA). Llamala cuando el usuario confirme que quiere agendar una reunión, o cuando la conversación se corte sin agendar pero ya tengas al menos zona, presupuesto y método de pago. Pasá todos los datos que tengas; no inventes ninguno. NUNCA calcules ni menciones vos mismo un puntaje o una prioridad.",
+          inputSchema: z.object({
+            operacion: z
+              .enum(["Venta", "Alquiler"])
+              .optional()
+              .describe("Venta (compra) o Alquiler"),
+            zona: z.string().optional().describe("Zona o barrio de interés"),
+            tipo: z
+              .string()
+              .optional()
+              .describe("Tipo de propiedad (Apartamento, Casa, Lote, Campo)"),
+            presupuesto: z
+              .number()
+              .optional()
+              .describe("Presupuesto en USD"),
+            intencionCompra: z
+              .string()
+              .optional()
+              .describe(
+                "Intención de compra o plazo de mudanza (ej: 'Menos de 3 meses', '3 a 6 meses', 'En el año')",
+              ),
+            metodoPago: z
+              .string()
+              .optional()
+              .describe(
+                "Método de pago (ej: 'Efectivo listo', 'Crédito hipotecario aprobado', 'Crédito en trámite')",
+              ),
+            propiedadInteresId: z
+              .number()
+              .optional()
+              .describe(
+                "ID de la propiedad puntual en la que mostró interés concreto, si la hay",
+              ),
+            nombre: z.string().optional().describe("Nombre del lead"),
+            telefono: z.string().optional().describe("Teléfono del lead"),
+            email: z.string().optional().describe("Email del lead"),
+          }),
+          execute: async (perfil) => {
+            try {
+              const { computeLeadScore } = await import("@/lib/leadScoring");
+              const { writeLeadRowServer } = await import("@/lib/leadSheet");
+
+              const score = computeLeadScore({
+                operacion: perfil.operacion,
+                zona: perfil.zona,
+                tipo: perfil.tipo,
+                presupuesto: perfil.presupuesto,
+                intencionCompra: perfil.intencionCompra,
+                metodoPago: perfil.metodoPago,
+                propiedadInteresId: perfil.propiedadInteresId,
+                nombre: perfil.nombre,
+                telefono: perfil.telefono,
+                email: perfil.email,
+              });
+
+              const propRef =
+                perfil.propiedadInteresId != null
+                  ? properties.find((p) => p.id === perfil.propiedadInteresId)
+                  : activeProp;
+              const propiedadInteres = propRef
+                ? `${propRef.tipo} en ${propRef.barrio}, ${propRef.departamento} (#${propRef.id})`
+                : "";
+
+              await writeLeadRowServer({
+                fecha: new Date().toISOString(),
+                nombre: perfil.nombre ?? "",
+                telefono: perfil.telefono ?? "",
+                email: perfil.email ?? "",
+                zona: perfil.zona ?? "",
+                tipo: perfil.tipo ?? "",
+                presupuesto:
+                  typeof perfil.presupuesto === "number"
+                    ? perfil.presupuesto
+                    : "",
+                intencionCompra: perfil.intencionCompra ?? "",
+                metodoPago: perfil.metodoPago ?? "",
+                operacion: perfil.operacion ?? "",
+                propiedadInteres,
+                matchEnCatalogo: score.matchEnCatalogo ? "Sí" : "No",
+                puntaje: score.puntaje,
+                prioridad: score.prioridad,
+              });
+
+              actions.push({
+                type: "registrar_lead",
+                puntaje: score.puntaje,
+                prioridad: score.prioridad,
+                matchEnCatalogo: score.matchEnCatalogo,
+              });
+
+              // El modelo NO debe ver ni comunicar el puntaje/prioridad.
+              return { ok: true };
+            } catch (err) {
+              console.error("[botAi] registrar_lead:", err);
+              return { ok: false };
             }
           },
         }),
