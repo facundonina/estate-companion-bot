@@ -613,16 +613,19 @@ export const generateBotMessage = createServerFn({ method: "POST" })
 
 // ===========================================================================
 // interpretAnswer: extracción NO bloqueante. Su único rol es extraer datos de
-// calificación (financiación, presupuesto, urgencia, plazo) del mensaje del
-// usuario para alimentar actualizar_perfil_lead. Ya NO decide si se repite una
-// pregunta ni controla el flujo. Devuelve siempre un objeto seguro.
+// calificación (método de pago, presupuesto, intención de compra) del mensaje
+// del usuario para alimentar actualizar_perfil_lead. Ya NO decide si se repite
+// una pregunta ni controla el flujo. Devuelve siempre un objeto seguro.
+// Para método de pago e intención de compra devuelve tanto el texto literal
+// como la categoría fija (la misma lista que usa la tool y el scoring).
 // ===========================================================================
 export interface ProfilePatch {
   operacion: string | null;
-  financiamiento: string | null;
+  metodoPagoTexto: string | null;
+  metodoPagoCategoria: string | null;
   presupuesto: number | null;
-  urgencia: string | null;
-  plazoCompra: string | null;
+  intencionCompraTexto: string | null;
+  intencionCompraCategoria: string | null;
 }
 
 const interpretInputSchema = z.object({
