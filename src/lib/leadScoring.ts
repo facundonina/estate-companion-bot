@@ -15,15 +15,13 @@ export interface LeadProfileForScoring {
   /**
    * Categoría fija de intención de compra / plazo de mudanza:
    * "Menos de 3 meses" | "3 a 6 meses" | "En el año" | "Sin definir".
-   * El puntaje SOLO usa esta categoría, nunca el texto literal del usuario.
    */
-  intencionCompraCategoria?: string;
+  intencionCompra?: string;
   /**
    * Categoría fija de método de pago:
    * "Efectivo listo" | "Crédito hipotecario aprobado" | "Crédito en trámite" | "Sin iniciar".
-   * El puntaje SOLO usa esta categoría, nunca el texto literal del usuario.
    */
-  metodoPagoCategoria?: string;
+  metodoPago?: string;
   /** ID de la propiedad puntual de interés, si la hay */
   propiedadInteresId?: number;
   nombre?: string;
