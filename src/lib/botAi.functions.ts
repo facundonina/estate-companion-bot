@@ -151,6 +151,7 @@ const perfilSchema = z.object({
   financiamiento: z.string().max(120).optional(),
   presupuesto: z.number().optional(),
   plazoCompra: z.string().max(120).optional(),
+  plazoMeses: z.number().optional(),
 });
 
 const chatInputSchema = z.object({
