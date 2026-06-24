@@ -438,6 +438,14 @@ export const chatWithBot = createServerFn({ method: "POST" })
             if (patch.intencion_compra_categoria)
               clean.intencionCompraCategoria = patch.intencion_compra_categoria;
             actions.push({ type: "actualizar_perfil_lead", patch: clean });
+            // Aplicamos el patch al perfil EN MEMORIA de esta misma llamada para
+            // que las tools que corran después en el mismo turno (sobre todo
+            // agendar_reunion) lean la categoría de financiación ACTUALIZADA y
+            // no el valor viejo con el que arrancó la request. Sin esto, el
+            // usuario podía decir "quiero crédito pero todavía no arranqué" y el
+            // bot ofrecía el calendario igual, porque agendar_reunion seguía
+            // viendo el metodoPagoCategoria anterior al patch.
+            Object.assign(data.perfil, clean);
             return { ok: true };
           },
         }),
