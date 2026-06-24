@@ -361,33 +361,23 @@ export function PropBot({
       l.operacion = patch.operacion;
       changed = true;
     }
-    if (patch.metodoPagoTexto) {
-      l.metodoPagoTexto = patch.metodoPagoTexto;
-      changed = true;
-    }
-    if (patch.metodoPagoCategoria) {
-      l.metodoPagoCategoria = patch.metodoPagoCategoria;
+    if (patch.metodoPago) {
+      l.metodoPago = patch.metodoPago;
       changed = true;
     }
     if (typeof patch.presupuesto === "number" && patch.presupuesto > 0) {
       l.presupuesto = patch.presupuesto;
       changed = true;
     }
-    if (patch.intencionCompraTexto) {
-      l.intencionCompraTexto = patch.intencionCompraTexto;
-      changed = true;
-    }
-    if (patch.intencionCompraCategoria) {
-      l.intencionCompraCategoria = patch.intencionCompraCategoria;
+    if (patch.intencionCompra) {
+      l.intencionCompra = patch.intencionCompra;
       changed = true;
     }
     if (changed) {
       l.prioridad = calcPrioridad(l);
       mergeStoredLead({
-        metodoPagoTexto: l.metodoPagoTexto,
-        metodoPagoCategoria: l.metodoPagoCategoria,
-        intencionCompraTexto: l.intencionCompraTexto,
-        intencionCompraCategoria: l.intencionCompraCategoria,
+        metodoPago: l.metodoPago,
+        intencionCompra: l.intencionCompra,
         presupuesto: l.presupuesto,
         prioridad: l.prioridad,
       });
