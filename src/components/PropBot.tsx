@@ -27,7 +27,91 @@ export interface BotLead {
   mensaje?: string;
 }
 
-type QuickReply = { label: string; value: string };
+type LeadPatch = {
+  operacion?: string;
+  financiamiento?: string;
+  presupuesto?: number;
+  urgencia?: string;
+  plazoCompra?: string;
+};
+
+type QuickReply = { label: string; value: string; patch?: LeadPatch };
+
+// Normaliza texto (minúsculas, sin acentos) para detectar qué está preguntando
+// el bot en su mensaje generado.
+function botNorm(s: string): string {
+  return (s || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+// A partir del texto que generó el bot, detecta si está haciendo una de las
+// preguntas de cierre/financiación/plazo y devuelve botones de respuesta rápida
+// (con el patch de perfil correspondiente) para evitar respuestas ambiguas.
+function detectQuickReplies(text: string): QuickReply[] | undefined {
+  const t = botNorm(text);
+  // Pregunta de cierre: ver una opción similar vs coordinar la visita.
+  if (t.includes("similar") && (t.includes("visita") || t.includes("coordin"))) {
+    return [
+      {
+        label: "Ver una opción similar",
+        value: "Prefiero ver una opción similar antes de decidir",
+      },
+      { label: "Coordinar la visita", value: "Ya quiero coordinar la visita" },
+    ];
+  }
+  // Pregunta de financiación / método de pago.
+  if (
+    (t.includes("pag") || t.includes("financ")) &&
+    (t.includes("contado") || t.includes("credito") || t.includes("efectivo"))
+  ) {
+    return [
+      {
+        label: "Contado",
+        value: "Lo pago al contado",
+        patch: { financiamiento: "Efectivo listo" },
+      },
+      {
+        label: "Crédito ya aprobado",
+        value: "Con crédito ya aprobado",
+        patch: { financiamiento: "Crédito hipotecario aprobado" },
+      },
+      {
+        label: "Crédito en trámite",
+        value: "Con crédito en trámite",
+        patch: { financiamiento: "Crédito en trámite" },
+      },
+    ];
+  }
+  // Pregunta de plazo: ¿para cuándo la necesitás?
+  if (
+    t.includes("cuando") &&
+    (t.includes("necesit") ||
+      t.includes("mudar") ||
+      t.includes("compr") ||
+      t.includes("para"))
+  ) {
+    return [
+      {
+        label: "Ya",
+        value: "La necesito ya",
+        patch: { urgencia: "Menos de 3 meses" },
+      },
+      {
+        label: "En los próximos meses",
+        value: "En los próximos meses",
+        patch: { urgencia: "3 a 6 meses" },
+      },
+      {
+        label: "Más adelante",
+        value: "Más adelante",
+        patch: { urgencia: "Más adelante" },
+      },
+    ];
+  }
+  return undefined;
+}
 
 type Slot = CalendarSlot;
 
