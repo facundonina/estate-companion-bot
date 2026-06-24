@@ -527,6 +527,9 @@ export function PropBot({
         .then((patch) => {
           if (!patch) return;
           applyPatch({
+            // La operación solo se aplica desde una charla general; si ya hay
+            // una propiedad puntual elegida, su operación manda (se fijó al abrir).
+            operacion: patch.operacion ?? undefined,
             financiamiento: patch.financiamiento ?? undefined,
             presupuesto: patch.presupuesto ?? undefined,
             urgencia: patch.urgencia ?? undefined,
@@ -534,6 +537,7 @@ export function PropBot({
           });
         })
         .catch(() => {});
+
 
       setTyping(true);
       let result: { text: string | null; actions: BotAction[] } | null = null;
