@@ -654,16 +654,14 @@ export const generateBotMessage = createServerFn({ method: "POST" })
 // calificación (método de pago, presupuesto, intención de compra) del mensaje
 // del usuario para alimentar actualizar_perfil_lead. Ya NO decide si se repite
 // una pregunta ni controla el flujo. Devuelve siempre un objeto seguro.
-// Para método de pago e intención de compra devuelve tanto el texto literal
-// como la categoría fija (la misma lista que usa la tool y el scoring).
+// Para método de pago e intención de compra devuelve directamente la categoría
+// fija (la misma lista que usa la tool y el scoring), sin texto literal.
 // ===========================================================================
 export interface ProfilePatch {
   operacion: string | null;
-  metodoPagoTexto: string | null;
-  metodoPagoCategoria: string | null;
+  metodoPago: string | null;
   presupuesto: number | null;
-  intencionCompraTexto: string | null;
-  intencionCompraCategoria: string | null;
+  intencionCompra: string | null;
 }
 
 const interpretInputSchema = z.object({
