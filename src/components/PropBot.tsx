@@ -449,11 +449,9 @@ export function PropBot({
             // La operación solo se aplica desde una charla general; si ya hay
             // una propiedad puntual elegida, su operación manda (se fijó al abrir).
             operacion: patch.operacion ?? undefined,
-            metodoPagoTexto: patch.metodoPagoTexto ?? undefined,
-            metodoPagoCategoria: patch.metodoPagoCategoria ?? undefined,
+            metodoPago: patch.metodoPago ?? undefined,
             presupuesto: patch.presupuesto ?? undefined,
-            intencionCompraTexto: patch.intencionCompraTexto ?? undefined,
-            intencionCompraCategoria: patch.intencionCompraCategoria ?? undefined,
+            intencionCompra: patch.intencionCompra ?? undefined,
           });
         })
         .catch(() => {});
