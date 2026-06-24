@@ -677,14 +677,15 @@ export const interpretAnswer = createServerFn({ method: "POST" })
         output: Output.object({
           schema: z.object({
             operacion: z.string(),
-            financiamiento: z.string(),
+            metodoPagoTexto: z.string(),
+            metodoPagoCategoria: z.string(),
             presupuesto: z.number(),
-            urgencia: z.string(),
-            plazoCompra: z.string(),
+            intencionCompraTexto: z.string(),
+            intencionCompraCategoria: z.string(),
           }),
         }),
         system:
-          "Sos un asistente de una inmobiliaria uruguaya. Extraé del último mensaje del usuario (usando el contexto) SOLO datos de calificación: operación (devolvé \"Venta\" si quiere comprar -comprar, comprarla, compra-, \"Alquiler\" si quiere alquilar -alquilar, rentar, alquilarla-), financiación (cómo paga), presupuesto en USD, urgencia y plazo de compra. No inventes: si un dato no aparece, devolvé \"NONE\" para los textos y 0 para el presupuesto.",
+          "Sos un asistente de una inmobiliaria uruguaya. Extraé del último mensaje del usuario (usando el contexto) SOLO datos de calificación: operación (devolvé \"Venta\" si quiere comprar -comprar, comprarla, compra-, \"Alquiler\" si quiere alquilar -alquilar, rentar, alquilarla-), método de pago y intención de compra (para cada uno devolvé DOS valores: el texto literal que dijo el usuario, y la categoría fija que mejor corresponda) y presupuesto en USD. Para metodoPagoCategoria usá EXACTAMENTE una de: \"Efectivo listo\", \"Crédito hipotecario aprobado\", \"Crédito en trámite\", \"No definido\" (al contado / tengo la plata / en efectivo = \"Efectivo listo\"). Para intencionCompraCategoria usá EXACTAMENTE una de: \"Menos de 3 meses\", \"3 a 6 meses\", \"En el año\", \"Sin definir\" (lo antes posible / ya / necesito mudarme ahora = \"Menos de 3 meses\"). No inventes: si un dato no aparece, devolvé \"NONE\" para los textos y 0 para el presupuesto. Si el usuario no dio método de pago, devolvé categoría \"No definido\"; si no dio intención, devolvé \"Sin definir\".",
         messages: [
           ...historyMessages,
           {
@@ -699,6 +700,11 @@ export const interpretAnswer = createServerFn({ method: "POST" })
         const s = typeof v === "string" ? v.trim() : "";
         return s && s.toUpperCase() !== "NONE" ? s : null;
       };
+      // Solo aceptamos categorías que pertenezcan a la lista fija.
+      const cat = (v: unknown, allowed: string[]) => {
+        const s = str(v);
+        return s && allowed.includes(s) ? s : null;
+      };
       const num =
         typeof output.presupuesto === "number" && output.presupuesto > 0
           ? Math.round(output.presupuesto)
@@ -706,10 +712,21 @@ export const interpretAnswer = createServerFn({ method: "POST" })
 
       return {
         operacion: operacionDet ?? str(output.operacion),
-        financiamiento: str(output.financiamiento),
+        metodoPagoTexto: str(output.metodoPagoTexto),
+        metodoPagoCategoria: cat(output.metodoPagoCategoria, [
+          "Efectivo listo",
+          "Crédito hipotecario aprobado",
+          "Crédito en trámite",
+          "No definido",
+        ]),
         presupuesto: num,
-        urgencia: str(output.urgencia),
-        plazoCompra: str(output.plazoCompra),
+        intencionCompraTexto: str(output.intencionCompraTexto),
+        intencionCompraCategoria: cat(output.intencionCompraCategoria, [
+          "Menos de 3 meses",
+          "3 a 6 meses",
+          "En el año",
+          "Sin definir",
+        ]),
       };
 
     } catch (err) {
