@@ -160,10 +160,11 @@ export type BotAction =
       type: "actualizar_perfil_lead";
       patch: {
         operacion?: string;
-        financiamiento?: string;
+        metodoPagoTexto?: string;
+        metodoPagoCategoria?: string;
         presupuesto?: number;
-        urgencia?: string;
-        plazoCompra?: string;
+        intencionCompraTexto?: string;
+        intencionCompraCategoria?: string;
       };
     }
   | { type: "agendar_reunion"; slots: CalendarSlot[] };
