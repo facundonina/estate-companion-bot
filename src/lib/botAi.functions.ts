@@ -179,10 +179,13 @@ const perfilSchema = z.object({
   operacion: z.string().max(40).optional(),
   ubicacion: z.string().max(120).optional(),
   tipo: z.string().max(60).optional(),
-  urgencia: z.string().max(120).optional(),
-  financiamiento: z.string().max(120).optional(),
+  // Método de pago: texto literal del usuario + categoría fija.
+  metodoPagoTexto: z.string().max(200).optional(),
+  metodoPagoCategoria: z.string().max(60).optional(),
+  // Intención de compra / plazo: texto literal del usuario + categoría fija.
+  intencionCompraTexto: z.string().max(200).optional(),
+  intencionCompraCategoria: z.string().max(60).optional(),
   presupuesto: z.number().optional(),
-  plazoCompra: z.string().max(120).optional(),
 });
 
 type PerfilLead = z.infer<typeof perfilSchema>;
@@ -194,9 +197,13 @@ function camposFaltantesParaAgendar(perfil: PerfilLead): string[] {
   if (!perfil.operacion) faltan.push("operación (compra o alquiler)");
   if (typeof perfil.presupuesto !== "number" || perfil.presupuesto <= 0)
     faltan.push("presupuesto");
-  if (!perfil.urgencia && !perfil.plazoCompra)
+  if (
+    !perfil.intencionCompraCategoria ||
+    perfil.intencionCompraCategoria === "Sin definir"
+  )
     faltan.push("intención de compra o plazo de mudanza");
-  if (!perfil.financiamiento) faltan.push("método de pago");
+  if (!perfil.metodoPagoCategoria || perfil.metodoPagoCategoria === "No definido")
+    faltan.push("método de pago");
   return faltan;
 }
 
