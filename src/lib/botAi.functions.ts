@@ -488,6 +488,18 @@ export const chatWithBot = createServerFn({ method: "POST" })
           content: m.text,
         }));
 
+      // Garantía de roles: la conversación SIEMPRE debe arrancar con un turno
+      // del usuario. Si el primer mensaje del historial es del asesor (p. ej. el
+      // saludo/opener generado por la app), Gemini puede "perder" quién es y
+      // ponerse a contestar como si fuera el cliente. Anclamos el rol con un
+      // turno inicial sintético del usuario.
+      if (messages.length && messages[0].role === "assistant") {
+        messages.unshift({
+          role: "user" as const,
+          content: "(Abrí el chat porque estoy mirando esta propiedad.)",
+        });
+      }
+
       const result = await generateText({
         model,
         system: `${SYSTEM_PROMPT}\n\n${STYLE_RULES}\n\nContexto actual (no lo menciones literalmente):\n${contextLines.join("\n")}`,
