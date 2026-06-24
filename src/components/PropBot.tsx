@@ -1,17 +1,20 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { extractFields, generateBotMessage } from "@/lib/botAi.functions";
+import {
+  chatWithBot,
+  generateBotMessage,
+  interpretAnswer,
+  type BotAction,
+} from "@/lib/botAi.functions";
 import { Building2, Send, Calendar, Bath, BedDouble, Maximize, ArrowRight } from "lucide-react";
 import { properties, type Property } from "@/data/properties";
 import { formatPrice } from "@/lib/format";
 import { propertyImage } from "@/lib/propertyImage";
 import { sendLeadToSheet } from "@/lib/leadSheet";
-import { parseBudget } from "@/lib/parseBudget";
 import { isAngryMessage, isAffirmative } from "@/lib/sentiment";
 import { mergeStoredLead } from "@/lib/leadStore";
 import {
-  getAvailableSlots,
   createCalendarEvent,
   type CalendarSlot,
 } from "@/lib/calendar.functions";
@@ -43,174 +46,7 @@ function firstName(n: string) {
   return (n || "").split(" ")[0] || "";
 }
 
-// Opciones válidas para cada pregunta de calificación. Si el usuario
-// responde algo que no corresponde, le pedimos que lo intente de nuevo.
-const URGENCIA_OPCIONES = [
-  "Menos de 3 meses",
-  "3 a 6 meses",
-  "En el año",
-  "Estoy explorando",
-];
-const FINANCIAMIENTO_OPCIONES = [
-  "Efectivo listo",
-  "Crédito hipotecario aprobado",
-  "Crédito en trámite",
-  "No lo definí todavía",
-];
 
-// Normaliza texto: minúsculas y sin acentos, para comparar intención.
-function norm(s: string): string {
-  return s
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .trim();
-}
-
-// Palabras clave que mapean texto libre del usuario a cada opción de urgencia.
-const URGENCIA_KEYWORDS: Record<string, string[]> = {
-  "Menos de 3 meses": [
-    "ya",
-    "cuanto antes",
-    "inmediato",
-    "inmediata",
-    "este mes",
-    "lo antes posible",
-    "urgente",
-    "ahora",
-    "proximos dias",
-    "en breve",
-    "enseguida",
-    "pronto",
-    "1 mes",
-    "un mes",
-    "2 meses",
-    "dos meses",
-    "3 meses",
-    "tres meses",
-    "uno a tres",
-    "1 a 3",
-    "corto plazo",
-  ],
-  "3 a 6 meses": [
-    "4 meses",
-    "cuatro meses",
-    "5 meses",
-    "cinco meses",
-    "6 meses",
-    "seis meses",
-    "medio ano",
-    "3 a 6",
-    "tres a seis",
-  ],
-  "En el año": [
-    "este ano",
-    "en el ano",
-    "dentro del ano",
-    "fin de ano",
-    "un ano",
-    "1 ano",
-    "12 meses",
-    "doce meses",
-  ],
-  "Estoy explorando": [
-    "explorando",
-    "mirando",
-    "viendo",
-    "no tengo apuro",
-    "sin apuro",
-    "largo plazo",
-    "mas adelante",
-    "evaluando",
-    "evaluando opciones",
-    "estoy evaluando",
-    "todavia no",
-    "no decidi",
-    "no me decidi",
-  ],
-};
-
-// Palabras clave que mapean texto libre a cada opción de financiamiento.
-const FINANCIAMIENTO_KEYWORDS: Record<string, string[]> = {
-  "Efectivo listo": [
-    "contado",
-    "al contado",
-    "efectivo",
-    "cash",
-    "ahorro",
-    "ahorros",
-    "fondos propios",
-    "dinero propio",
-    "plata propia",
-    "capital propio",
-    "pago total",
-    "pago completo",
-    "pago de una",
-    "tengo el dinero",
-    "dispongo del dinero",
-    "sin financiacion",
-    "sin credito",
-  ],
-  "Crédito hipotecario aprobado": [
-    "credito aprobado",
-    "aprobado",
-    "hipoteca aprobada",
-    "prestamo aprobado",
-    "credito otorgado",
-    "ya tengo el credito",
-    "tengo el credito",
-  ],
-  "Crédito en trámite": [
-    "credito hipotecario",
-    "credito",
-    "prestamo hipotecario",
-    "prestamo del banco",
-    "prestamo",
-    "hipoteca",
-    "banco",
-    "financiacion bancaria",
-    "financiamiento",
-    "financiar",
-    "voy a financiar",
-    "en tramite",
-    "tramite",
-    "tramitando",
-    "gestionando",
-  ],
-  "No lo definí todavía": [
-    "no se",
-    "no lo se",
-    "no defini",
-    "no decidi",
-    "todavia no",
-    "no estoy seguro",
-    "no sabria",
-    "ver opciones",
-  ],
-};
-
-// Dado un texto libre, lo asigna a la opción correspondiente según su
-// intención. Primero busca coincidencia exacta con una opción, luego por
-// palabras clave (respetando el orden de prioridad de las opciones).
-function matchOption(
-  raw: string,
-  options: string[],
-  keywords: Record<string, string[]>,
-): string | null {
-  const t = norm(raw);
-  for (const o of options) if (norm(o) === t) return o;
-  for (const o of options) {
-    for (const kw of keywords[o] || []) {
-      if (t.includes(norm(kw))) return o;
-    }
-  }
-  return null;
-}
-
-const matchUrgencia = (raw: string) =>
-  matchOption(raw, URGENCIA_OPCIONES, URGENCIA_KEYWORDS);
-const matchFinanciamiento = (raw: string) =>
-  matchOption(raw, FINANCIAMIENTO_OPCIONES, FINANCIAMIENTO_KEYWORDS);
 
 function scoreProp(p: Property, lead: BotLeadState): number {
   let s = 0;
@@ -237,6 +73,7 @@ interface BotLeadState extends BotLead {
   garage?: boolean;
   urgencia?: string;
   financiamiento?: string;
+  plazoCompra?: string;
   prioridad?: string;
 }
 
@@ -252,38 +89,6 @@ function calcPrioridad(lead: BotLeadState): string {
   if (tieneDinero && urgenciaMedia) return "Media";
   if (tieneDinero || urgenciaAlta) return "Media";
   return "Baja";
-}
-
-
-
-
-// Evalúa si el lead realmente califica para ESTA propiedad puntual.
-// Devuelve los motivos por los que NO calificaría (vacío = califica).
-function qualifyForProperty(
-  p: Property,
-  lead: BotLeadState,
-): { ok: boolean; reasons: string[] } {
-  const reasons: string[] = [];
-
-  // Estado de obra vs. urgencia de mudanza.
-  const enObra = p.estado === "En construcción" || p.estado === "En pozo";
-  if (enObra && lead.urgencia === "Menos de 3 meses") {
-    reasons.push(
-      `esta propiedad está en estado "${p.estado}", así que no estaría lista para mudarte en menos de 3 meses`,
-    );
-  }
-
-  // Presupuesto vs. precio: no puede ser menor al 60% del valor.
-  if (lead.presupuesto && lead.presupuesto < p.precio * 0.6) {
-    reasons.push(
-      `tu presupuesto queda bastante por debajo del precio de esta propiedad (${formatPrice(
-        p.precio,
-        p.moneda,
-      )})`,
-    );
-  }
-
-  return { ok: reasons.length === 0, reasons };
 }
 
 // Construye el payload para Google Sheets incluyendo la propiedad puntual
@@ -309,12 +114,6 @@ function leadPayload(lead: BotLeadState, prop: Property) {
     propiedadLink: `${origin}/propiedades/${prop.id}`,
   };
 }
-
-
-
-
-
-
 
 function PropertyCardBubble({ p }: { p: Property }) {
   const isLand = p.tipo === "Lote" || p.tipo === "Campo";
@@ -381,16 +180,13 @@ export function PropBot({
   const [slotConfirmed, setSlotConfirmed] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [availableSlots, setAvailableSlots] = useState<CalendarSlot[]>([]);
-  const [notQualified, setNotQualified] = useState(false);
 
   const leadRef = useRef<BotLeadState>({ ...lead });
-  const stepRef = useRef(0);
   // Propiedad por la que el lead muestra interés en este momento (puede
   // cambiar si elige "Me interesa también" sobre una recomendación).
   const activePropRef = useRef<Property>(property);
   const offeredRecRef = useRef(false);
-  // Horario ya confirmado para la reunión. Si el lead suma otra propiedad
-  // con "Me interesa también", la coordinamos en este mismo horario.
+  // Horario ya confirmado para la reunión.
   const confirmedSlotRef = useRef<Slot | null>(null);
   const idRef = useRef(0);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -399,13 +195,11 @@ export function PropBot({
   // En modo "secundario" esperamos que confirme si quiere avanzar también
   // por esta propiedad antes de seguir con el flujo.
   const secondaryConfirmRef = useRef(false);
-  // Último campo que el bot le pidió al usuario (para detectar respuestas
-  // que no aportan el dato esperado y pedir una aclaración).
-  const lastAskedRef = useRef<"urgencia" | "financiamiento" | "presupuesto" | null>(
-    null,
-  );
+  // Marca si ya enviamos el lead al Sheet (para no duplicarlo).
+  const leadSentRef = useRef(false);
 
-  const extract = useServerFn(extractFields);
+  const chat = useServerFn(chatWithBot);
+  const interpret = useServerFn(interpretAnswer);
   const genMsg = useServerFn(generateBotMessage);
 
   // Espejo del historial para enviarlo como contexto a la IA sin recrear callbacks.
@@ -420,23 +214,45 @@ export function PropBot({
     setMessages((prev) => [...prev, { ...msg, id: nextId() }]);
   }, []);
 
-  // Pide a Gemini que redacte el próximo mensaje del bot según una instrucción
-  // interna. Si la IA falla o no está disponible, usa el texto de respaldo.
+  // Devuelve el historial COMPLETO de la conversación (sin recortar), más el
+  // mensaje actual del usuario si se pasa. Se envía como contexto a la IA.
+  const fullHistory = useCallback(
+    (appendUser?: string) => {
+      const base = messagesRef.current
+        .filter((m) => m.text)
+        .map((m) => ({ role: m.role, text: m.text as string }));
+      if (appendUser) base.push({ role: "user", text: appendUser });
+      return base;
+    },
+    [],
+  );
+
+  // Perfil acumulado del lead (financiación, presupuesto, urgencia, plazo).
+  const buildPerfil = useCallback(() => {
+    const l = leadRef.current;
+    return {
+      nombre: l.nombre,
+      ubicacion: l.zona,
+      tipo: l.tipo,
+      urgencia: l.urgencia,
+      financiamiento: l.financiamiento,
+      presupuesto: l.presupuesto,
+      plazoCompra: l.plazoCompra,
+    };
+  }, []);
+
+  // Pide a Gemini que redacte un mensaje guiado por la app (saludo, opener).
   const phrase = useCallback(
     async (instruction: string, fallback: string): Promise<string> => {
       try {
-        const history = messagesRef.current
-          .filter((m) => m.text)
-          .slice(-12)
-          .map((m) => ({ role: m.role, text: m.text as string }));
-        const res = await genMsg({ data: { history, instruction } });
+        const res = await genMsg({ data: { history: fullHistory(), instruction } });
         return (res?.text || "").trim() || fallback;
       } catch (err) {
         console.error("[PropBot] generateBotMessage:", err);
         return fallback;
       }
     },
-    [genMsg],
+    [genMsg, fullHistory],
   );
 
   const botReply = useCallback(
@@ -450,7 +266,7 @@ export function PropBot({
   );
 
   // Igual que botReply, pero el texto lo redacta Gemini a partir de la
-  // instrucción (con fallback). Mantiene el indicador de "escribiendo".
+  // instrucción (con fallback). Se usa solo para mensajes guiados (opener).
   const botSay = useCallback(
     async (
       instruction: string,
@@ -467,140 +283,141 @@ export function PropBot({
     [phrase, addMsg],
   );
 
-  // Consulta Google Calendar y muestra los horarios disponibles como agenda.
-  // El texto introductorio lo redacta Gemini (con fallback).
-  const presentAgenda = useCallback(
-    async (instruction: string, fallback: string) => {
-      setTyping(true);
-      try {
-        const slots = await getAvailableSlots();
-        setAvailableSlots(slots);
-        if (slots.length === 0) {
-          await botReply(
-            {
-              text: "Por ahora no tengo horarios disponibles en los próximos días. Un asesor se va a contactar con vos para coordinar la visita. ¡Gracias!",
-            },
-            800,
-          );
-          setDone(true);
-        } else {
-          const text = await phrase(instruction, fallback);
-          await new Promise((r) => setTimeout(r, 300));
-          setTyping(false);
-          addMsg({ role: "bot", text, agenda: true });
-        }
-      } catch (err) {
-        console.error("[calendar] No se pudieron obtener los horarios:", err);
-        await botReply(
-          {
-            text: "Tuve un problema al consultar la agenda. Un asesor se va a contactar con vos para coordinar la visita. ¡Gracias!",
-          },
-          800,
-        );
-        setDone(true);
-      }
-    },
-    [botReply, phrase, addMsg],
-  );
-
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages, typing]);
 
-  const recommendProps = useCallback((): { cards: Property[]; expanded: boolean } => {
+  // Recomendaciones locales para sugerir tras confirmar la visita.
+  const recommendProps = useCallback((): Property[] => {
     const lead = leadRef.current;
     const pool = properties.filter((x) => x.id !== activePropRef.current.id);
-
     const tipoOk = (p: Property) => !lead.tipo || p.tipo === lead.tipo;
-    // Solo recomendamos en la MISMA zona que está consultando el lead.
     const zonaOk = (p: Property) => !lead.zona || p.zona === lead.zona;
-    // El precio no puede superar el presupuesto del usuario (con un margen
-    // chico del 10%). Nunca recomendamos propiedades fuera de su alcance.
     const budgetOk = (p: Property) =>
       !lead.presupuesto || p.precio <= lead.presupuesto * 1.1;
     const sortTop = (arr: Property[]) =>
       [...arr].sort((a, b) => scoreProp(b, lead) - scoreProp(a, lead));
 
-    // Paso 1: misma zona + filtros duros (tipo + presupuesto).
-    let filtered = pool.filter(
-      (p) => zonaOk(p) && tipoOk(p) && budgetOk(p),
-    );
-
-    // Paso 2: si hay menos de 3, relajar el tipo pero SIEMPRE respetando la
-    // misma zona y el presupuesto. Nunca cambiamos de zona ni recomendamos
-    // fuera del alcance del lead.
+    let filtered = pool.filter((p) => zonaOk(p) && tipoOk(p) && budgetOk(p));
     if (filtered.length < 3) {
       filtered = pool.filter((p) => zonaOk(p) && budgetOk(p));
     }
-
-    return { cards: sortTop(filtered).slice(0, 3), expanded: false };
+    return sortTop(filtered).slice(0, 3);
   }, []);
 
-  // Con urgencia, financiamiento y presupuesto ya conocidos, evalúa si el lead
-  // califica para la propiedad activa: si sí, entrega el lead y abre la agenda;
-  // si no, deriva a otras opciones. Persiste la calificación para reutilizarla
-  // en próximos chats de esta sesión.
-  const finalizeQualification = useCallback(async () => {
-    const lead = leadRef.current;
-    lastAskedRef.current = null;
-    lead.prioridad = calcPrioridad(lead);
-    mergeStoredLead({
-      urgencia: lead.urgencia,
-      financiamiento: lead.financiamiento,
-      presupuesto: lead.presupuesto,
-      prioridad: lead.prioridad,
-    });
-
-    const { ok, reasons } = qualifyForProperty(activePropRef.current, lead);
-
-    // No califica para esta propiedad: NO entregamos el lead.
-    // Lo derivamos a ver opciones que sí encajan.
-    if (!ok) {
-      const { cards } = recommendProps();
-      await botSay(
-        `Agradecele que te contó sus datos. Con tacto y sin mencionar ninguna calificación interna, explicale que esta propiedad puntual no sería la mejor opción para él/ella por estos motivos: ${reasons.join(
-          " y ",
-        )}.`,
-        `Gracias por contarme. Mirando lo que necesitás, ${reasons.join(
-          " y ",
-        )}. Por eso esta propiedad no sería la mejor opción para vos.`,
-        {},
-        500,
-      );
-      if (cards.length > 0) {
-        await new Promise((r) => setTimeout(r, 400));
-        await botSay(
-          "Presentale, con entusiasmo, estas otras opciones que sí encajan con su presupuesto y preferencias (se muestran como tarjetas debajo). Invitalo a tocar el botón 'Ver' para conocer la que le guste.",
-          "Con tus preferencias, estas opciones sí encajan mejor. Tocá “Ver” en la que te interese para conocerla:",
-          { recCards: cards },
-        );
-      } else {
-        await new Promise((r) => setTimeout(r, 400));
-        await botSay(
-          lead.zona
-            ? `Explicale que por ahora en ${lead.zona} no tenés propiedades que se ajusten a su presupuesto, e invitalo a recorrer el catálogo completo por si encuentra algo que le guste. Debajo de tu mensaje hay un botón para verlo.`
-            : "Explicale que por ahora no tenés propiedades que se ajusten a su presupuesto y a lo que busca, e invitalo a recorrer el catálogo completo. Debajo de tu mensaje hay un botón para verlo.",
-          lead.zona
-            ? `Por ahora en ${lead.zona} no tenemos propiedades que se ajusten a tu presupuesto. De todos modos, te invito a recorrer todo nuestro catálogo por si encontrás algo que te guste 👇`
-            : "Por ahora no tenemos propiedades que se ajusten a tu presupuesto y a lo que estás buscando. De todos modos, te invito a recorrer todo nuestro catálogo por si encontrás algo que te guste 👇",
-          { cta: { label: "Ver propiedades disponibles" } },
-        );
+  // Aplica al perfil un patch de calificación y lo persiste (no bloquea).
+  const applyPatch = useCallback(
+    (patch: {
+      financiamiento?: string;
+      presupuesto?: number;
+      urgencia?: string;
+      plazoCompra?: string;
+    }) => {
+      const l = leadRef.current;
+      let changed = false;
+      if (patch.financiamiento) {
+        l.financiamiento = patch.financiamiento;
+        changed = true;
       }
-      setNotQualified(true);
-      return;
-    }
+      if (typeof patch.presupuesto === "number" && patch.presupuesto > 0) {
+        l.presupuesto = patch.presupuesto;
+        changed = true;
+      }
+      if (patch.urgencia) {
+        l.urgencia = patch.urgencia;
+        changed = true;
+      }
+      if (patch.plazoCompra) {
+        l.plazoCompra = patch.plazoCompra;
+        changed = true;
+      }
+      if (changed) {
+        l.prioridad = calcPrioridad(l);
+        mergeStoredLead({
+          urgencia: l.urgencia,
+          financiamiento: l.financiamiento,
+          presupuesto: l.presupuesto,
+          prioridad: l.prioridad,
+        });
+      }
+    },
+    [],
+  );
 
-    // Califica: entregamos el lead y coordinamos la visita.
-    void sendLeadToSheet(leadPayload(lead, activePropRef.current));
-    stepRef.current = 4;
-    await presentAgenda(
-      "El usuario calificó. Agradecele y proponele coordinar una visita presencial para conocer la propiedad. Pedile que elija uno de los horarios disponibles (se muestran como botones debajo).",
-      "¡Gracias! Podemos coordinar una visita para que la conozcas en persona. Elegí uno de los horarios disponibles:",
-    );
-  }, [botSay, presentAgenda, recommendProps]);
+  // Núcleo conversacional: en cada mensaje del usuario se envía el historial
+  // completo + el perfil acumulado + la propiedad activa a Gemini, que decide
+  // qué herramientas usar. El cliente solo renderiza el texto y las acciones.
+  const runBot = useCallback(
+    async (userText: string) => {
+      // Extracción NO bloqueante en paralelo: alimenta el perfil sin demorar
+      // la respuesta (red de seguridad de actualizar_perfil_lead).
+      void interpret({ data: { history: fullHistory(), message: userText } })
+        .then((patch) => {
+          if (!patch) return;
+          applyPatch({
+            financiamiento: patch.financiamiento ?? undefined,
+            presupuesto: patch.presupuesto ?? undefined,
+            urgencia: patch.urgencia ?? undefined,
+            plazoCompra: patch.plazoCompra ?? undefined,
+          });
+        })
+        .catch(() => {});
 
+      setTyping(true);
+      let result: { text: string | null; actions: BotAction[] } | null = null;
+      try {
+        result = await chat({
+          data: {
+            history: fullHistory(userText),
+            perfil: buildPerfil(),
+            propertyId: activePropRef.current.id,
+          },
+        });
+      } catch (err) {
+        console.error("[PropBot] chatWithBot:", err);
+      }
+
+      const extra: Omit<BotMessage, "id" | "role" | "text"> = {};
+      let agendaShown = false;
+
+      for (const a of result?.actions ?? []) {
+        if (a.type === "actualizar_perfil_lead") {
+          applyPatch(a.patch);
+        } else if (a.type === "buscar_propiedades") {
+          const cards = a.ids
+            .map((id) => properties.find((p) => p.id === id))
+            .filter((p): p is Property => Boolean(p));
+          if (cards.length) extra.recCards = cards;
+        } else if (a.type === "obtener_detalle_propiedad") {
+          const p = properties.find((x) => x.id === a.id);
+          if (p && p.id !== activePropRef.current.id) extra.card = p;
+        } else if (a.type === "agendar_reunion") {
+          if (a.slots.length) {
+            setAvailableSlots(a.slots);
+            extra.agenda = true;
+            agendaShown = true;
+          }
+        }
+      }
+
+      // Si el modelo ofreció agendar, el lead califica: lo enviamos al Sheet.
+      if (agendaShown && !leadSentRef.current) {
+        leadSentRef.current = true;
+        void sendLeadToSheet(leadPayload(leadRef.current, activePropRef.current));
+      }
+
+      const text =
+        (result?.text || "").trim() ||
+        "Perdón, no te entendí bien. ¿Me lo contás de nuevo?";
+
+      await new Promise((r) => setTimeout(r, 300));
+      setTyping(false);
+      addMsg({ role: "bot", text, ...extra });
+    },
+    [chat, interpret, fullHistory, buildPerfil, applyPatch, addMsg],
+  );
 
   // Kick off the conversation once.
   useEffect(() => {
@@ -612,8 +429,7 @@ export function PropBot({
       leadRef.current.tipo = property.tipo;
 
       // Modo secundario: el usuario ya dejó sus datos y eligió ver otra
-      // propiedad recomendada. No le pedimos el formulario de nuevo: abrimos
-      // un chat con sus datos y le preguntamos si quiere avanzar por esta.
+      // propiedad recomendada. No le pedimos el formulario de nuevo.
       if (secondary) {
         await botSay(
           `Saludá a ${firstName(lead.nombre)} por su nombre, de forma cálida y como si ya se conocieran. Decile que viste que también se interesó en esta propiedad: ${propDesc}. Preguntale con entusiasmo si le gustaría avanzar por esta propiedad también. La tarjeta se muestra debajo de tu mensaje; no le pidas sus datos porque ya los tenés.`,
@@ -632,26 +448,16 @@ export function PropBot({
       }
 
       await botSay(
-        `Saludá a ${firstName(lead.nombre)} por su nombre y, con entusiasmo, contale que viste que se interesó en esta propiedad: ${propDesc}. Presentate brevemente como PropBot. No hagas preguntas todavía: la tarjeta de la propiedad se muestra debajo de tu mensaje.`,
+        `Saludá a ${firstName(lead.nombre)} por su nombre y, con entusiasmo, contale que viste que se interesó en esta propiedad: ${propDesc}. Presentate brevemente como asesor inmobiliario. No hagas preguntas todavía: la tarjeta de la propiedad se muestra debajo de tu mensaje.`,
         `¡Hola ${firstName(lead.nombre)}! Vi que te interesaste en esta propiedad:`,
         { card: property },
         650,
       );
       await new Promise((r) => setTimeout(r, 300));
       await botSay(
-        "Decile que, antes de coordinar la visita, te gustaría conocer un par de cosas para asegurarte de que sea la mejor opción para él/ella. Después hacé UNA sola pregunta: con qué urgencia o para cuándo necesita concretar la compra.",
-        "Genial. Antes de coordinar la visita, me gustaría conocer un par de cosas para asegurarme de que sea la mejor opción para vos. ¿Cuándo necesitás concretar la compra?",
-        {
-          quickReplies: [
-            { label: "Menos de 3 meses", value: "Menos de 3 meses" },
-            { label: "3 a 6 meses", value: "3 a 6 meses" },
-            { label: "En el año", value: "En el año" },
-            { label: "Estoy explorando", value: "Estoy explorando" },
-          ],
-        },
+        "Invitá al usuario, de forma abierta y cálida, a contarte qué está buscando o a preguntarte lo que quiera sobre la propiedad. No le des opciones cerradas ni hagas una pregunta de calificación todavía; dejá que lleve la conversación.",
+        "Contame, ¿qué te gustaría saber o qué estás buscando? Estoy para ayudarte con lo que necesites.",
       );
-      stepRef.current = 2;
-      lastAskedRef.current = "urgencia";
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -663,8 +469,7 @@ export function PropBot({
       addMsg({ role: "user", text });
       setInput("");
 
-      // Modo secundario: esperábamos que confirme si quiere avanzar también
-      // por esta propiedad. Ya tenemos sus datos, así que no pedimos formulario.
+      // Modo secundario: confirmación de avanzar por esta propiedad.
       if (secondaryConfirmRef.current) {
         secondaryConfirmRef.current = false;
         if (!isAffirmative(text)) {
@@ -677,29 +482,9 @@ export function PropBot({
           setDone(true);
           return;
         }
-        const lead = leadRef.current;
-        // Si en un chat anterior ya nos dio su calificación, vamos directo a
-        // evaluar y coordinar la visita. Si no, arrancamos las preguntas.
-        if (lead.urgencia && lead.financiamiento && lead.presupuesto) {
-          await finalizeQualification();
-          return;
-        }
-        stepRef.current = 2;
-        lastAskedRef.current = "urgencia";
-        await botSay(
-          "El usuario quiere avanzar por esta propiedad. Decile que para asegurarte de que sea la mejor opción para él/ella querés conocer un par de cosas, y hacé UNA sola pregunta: con qué urgencia o para cuándo necesita concretar la compra (las opciones aparecen como botones debajo).",
-          "¡Buenísimo! Para asegurarme de que sea la mejor opción para vos, ¿cuándo necesitás concretar la compra?",
-          {
-            quickReplies: URGENCIA_OPCIONES.map((o) => ({
-              label: o,
-              value: o,
-            })),
-          },
-        );
+        await runBot(text);
         return;
       }
-
-
 
       // ¿Estábamos esperando que confirme si quiere hablar con un humano?
       if (awaitingHumanRef.current) {
@@ -715,7 +500,7 @@ export function PropBot({
         }
         await botReply(
           {
-            text: "¡Dale, seguimos por acá! 😊 Cuando quieras, respondé la última pregunta para continuar.",
+            text: "¡Dale, seguimos por acá! 😊 Contame, ¿en qué te puedo ayudar?",
           },
           600,
         );
@@ -738,7 +523,6 @@ export function PropBot({
         return;
       }
 
-
       if (done) {
         await botReply(
           {
@@ -749,147 +533,10 @@ export function PropBot({
         return;
       }
 
-      const lead = leadRef.current;
-
-      // Fase de recolección de datos de calificación (urgencia, financiamiento
-      // y presupuesto). La IA interpreta TODO el mensaje del usuario y extrae,
-      // de una sola vez, los datos que todavía falten.
-      if (
-        stepRef.current === 2 ||
-        stepRef.current === 3 ||
-        stepRef.current === 5
-      ) {
-        const fields: Array<{
-          name: string;
-          kind: "option" | "number" | "budget";
-          description: string;
-          options?: string[];
-        }> = [];
-        if (!lead.urgencia)
-          fields.push({
-            name: "urgencia",
-            kind: "option",
-            description:
-              "Con qué urgencia o para cuándo necesita concretar la compra.",
-            options: URGENCIA_OPCIONES,
-          });
-        if (!lead.financiamiento)
-          fields.push({
-            name: "financiamiento",
-            kind: "option",
-            description: "Cómo piensa financiar la compra.",
-            options: FINANCIAMIENTO_OPCIONES,
-          });
-        if (!lead.presupuesto)
-          fields.push({
-            name: "presupuesto",
-            kind: "budget",
-            description: "Presupuesto aproximado en dólares para esta compra.",
-          });
-
-        setTyping(true);
-        try {
-          const history = messagesRef.current
-            .filter((m) => m.text)
-            .slice(-12)
-            .map((m) => ({ role: m.role, text: m.text as string }));
-          const res = await extract({
-            data: { history, message: text, fields },
-          });
-          const v = res?.values ?? {};
-          if (typeof v.urgencia === "string") lead.urgencia = v.urgencia;
-          if (typeof v.financiamiento === "string")
-            lead.financiamiento = v.financiamiento;
-          if (typeof v.presupuesto === "number" && v.presupuesto > 0)
-            lead.presupuesto = v.presupuesto;
-        } catch (err) {
-          console.error("[PropBot] extract:", err);
-        }
-        setTyping(false);
-
-        // Respaldo local SOLO para el dato que se acaba de pedir, por si la IA
-        // no está disponible o no lo detectó.
-        const expected = lastAskedRef.current;
-        if (!lead.urgencia && expected === "urgencia") {
-          const u = matchUrgencia(text);
-          if (u) lead.urgencia = u;
-        }
-        if (!lead.financiamiento && expected === "financiamiento") {
-          const f = matchFinanciamiento(text);
-          if (f) lead.financiamiento = f;
-        }
-        if (!lead.presupuesto && expected === "presupuesto") {
-          const b = parseBudget(text);
-          if (b) lead.presupuesto = b;
-        }
-
-        const stillMissingExpected =
-          (expected === "urgencia" && !lead.urgencia) ||
-          (expected === "financiamiento" && !lead.financiamiento) ||
-          (expected === "presupuesto" && !lead.presupuesto);
-
-        // Próxima pregunta según el primer dato que falte.
-        if (!lead.urgencia) {
-          stepRef.current = 2;
-          lastAskedRef.current = "urgencia";
-          await botSay(
-            stillMissingExpected
-              ? "No entendiste la respuesta del usuario sobre la urgencia. Pedile con amabilidad que te aclare para cuándo necesita concretar la compra, dándole ejemplos como 'lo antes posible', 'en unos meses' o 'estoy explorando'."
-              : "Hacé UNA sola pregunta: con qué urgencia o para cuándo necesita concretar la compra (las opciones aparecen como botones debajo).",
-            "¿Cuándo necesitás concretar la compra?",
-            {
-              quickReplies: URGENCIA_OPCIONES.map((o) => ({
-                label: o,
-                value: o,
-              })),
-            },
-          );
-          return;
-        }
-        if (!lead.financiamiento) {
-          stepRef.current = 3;
-          lastAskedRef.current = "financiamiento";
-          await botSay(
-            stillMissingExpected
-              ? "No entendiste cómo piensa financiar la compra. Pedile que te lo aclare, con ejemplos como 'al contado' o 'con crédito hipotecario'."
-              : `Ya sabés que su urgencia es "${lead.urgencia}". Reconocelo brevemente y hacé UNA sola pregunta: cómo piensa financiar la compra (las opciones aparecen como botones debajo).`,
-            "¿Cómo pensás financiar la compra?",
-            {
-              quickReplies: FINANCIAMIENTO_OPCIONES.map((o) => ({
-                label: o,
-                value: o,
-              })),
-            },
-          );
-          return;
-        }
-        if (!lead.presupuesto) {
-          stepRef.current = 5;
-          lastAskedRef.current = "presupuesto";
-          await botSay(
-            stillMissingExpected
-              ? "No pudiste entender el monto del presupuesto. Pedile que lo escriba en dólares con un ejemplo (90.000 o USD 120.000)."
-              : "Hacé UNA sola pregunta: cuál es su presupuesto aproximado para esta compra, pidiéndole que lo escriba en dólares con un ejemplo (90.000 o USD 120.000).",
-            "Por último, ¿cuál es tu presupuesto aproximado para esta compra? Escribilo en dólares (por ejemplo: 90.000 o USD 120.000).",
-          );
-          return;
-        }
-
-        // Tenemos urgencia, financiamiento y presupuesto: calificamos.
-        await finalizeQualification();
-        return;
-      }
+      // Conversación libre: la maneja Gemini con function calling.
+      await runBot(text);
     },
-    [
-      addMsg,
-      botReply,
-      botSay,
-      done,
-      extract,
-      finalizeQualification,
-      presentAgenda,
-      typing,
-    ],
+    [addMsg, botReply, done, runBot, typing],
   );
 
   const confirmSlot = useCallback(async () => {
@@ -927,11 +574,10 @@ export function PropBot({
       setDone(true);
 
       // Una sola vez: ofrecemos otras propiedades que también podrían
-      // interesarle. Si elige alguna, reutilizamos sus datos (no volvemos
-      // a preguntar) y coordinamos otra visita.
+      // interesarle.
       if (!offeredRecRef.current) {
         offeredRecRef.current = true;
-        const { cards } = recommendProps();
+        const cards = recommendProps();
         if (cards.length > 0) {
           await new Promise((r) => setTimeout(r, 600));
           await botSay(
@@ -952,9 +598,6 @@ export function PropBot({
       );
     }
   }, [addMsg, botReply, botSay, confirming, recommendProps, selectedSlot, slotConfirmed]);
-
-
-
 
   return (
     <div className="flex h-[560px] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-card">
@@ -1109,18 +752,6 @@ export function PropBot({
           </p>
           <p className="mt-0.5 text-[12px] text-muted-foreground">
             Esta conversación quedó cerrada. ¡Nos vemos en la visita!
-          </p>
-        </div>
-      ) : notQualified ? (
-        <div className="border-t border-border p-3.5 text-center">
-          <Link
-            to="/propiedades"
-            className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-[13px] font-semibold text-primary-foreground transition-opacity hover:opacity-90"
-          >
-            Ver propiedades disponibles <ArrowRight size={14} />
-          </Link>
-          <p className="mt-2 text-[12px] text-muted-foreground">
-            Explorá las opciones que mejor se ajustan a vos.
           </p>
         </div>
       ) : (
