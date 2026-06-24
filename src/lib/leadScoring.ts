@@ -177,7 +177,7 @@ export function computeLeadScore(
   const puntaje = pIntencion + pPago + pMatch + pCompletitud; // 0–9
 
   let prioridad: "Alta" | "Media" | "Baja";
-  if (plataDisponible(perfil.metodoPago)) {
+  if (plataDisponible(perfil.metodoPagoCategoria)) {
     // Plata disponible (efectivo o crédito hipotecario aprobado) => Alta directo.
     prioridad = "Alta";
   } else if (puntaje >= 6) prioridad = "Alta";
