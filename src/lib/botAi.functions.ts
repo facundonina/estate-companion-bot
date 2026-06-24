@@ -758,11 +758,9 @@ export const interpretAnswer = createServerFn({ method: "POST" })
 
       return {
         operacion: operacionDet ?? str(output.operacion),
-        metodoPagoTexto: str(output.metodoPagoTexto),
-        metodoPagoCategoria: catMetodoPago(output.metodoPagoCategoria),
+        metodoPago: catMetodoPago(output.metodoPago),
         presupuesto: num,
-        intencionCompraTexto: str(output.intencionCompraTexto),
-        intencionCompraCategoria: cat(output.intencionCompraCategoria, [
+        intencionCompra: cat(output.intencionCompra, [
           "Menos de 3 meses",
           "3 a 6 meses",
           "En el año",
