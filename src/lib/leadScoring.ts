@@ -20,7 +20,7 @@ export interface LeadProfileForScoring {
   intencionCompraCategoria?: string;
   /**
    * Categoría fija de método de pago:
-   * "Efectivo listo" | "Crédito hipotecario aprobado" | "Crédito en trámite" | "No definido".
+   * "Efectivo listo" | "Crédito hipotecario aprobado" | "Crédito en trámite" | "Sin iniciar".
    * El puntaje SOLO usa esta categoría, nunca el texto literal del usuario.
    */
   metodoPagoCategoria?: string;
@@ -47,6 +47,22 @@ function norm(s: string | undefined): string {
     .trim();
 }
 
+function categoriaMetodoPago(v: string | undefined):
+  | "Efectivo listo"
+  | "Crédito hipotecario aprobado"
+  | "Crédito en trámite"
+  | "Sin iniciar" {
+  const n = norm(v);
+  if (n.includes("efectivo")) return "Efectivo listo";
+  if (n.includes("hipotecario") && n.includes("aprobad")) {
+    return "Crédito hipotecario aprobado";
+  }
+  if (n.includes("credito") && (n.includes("tramite") || n.includes("gestion"))) {
+    return "Crédito en trámite";
+  }
+  return "Sin iniciar";
+}
+
 // Puntos por intención de compra / plazo de mudanza.
 function puntosIntencion(v: string | undefined): number {
   const n = norm(v);
@@ -60,11 +76,10 @@ function puntosIntencion(v: string | undefined): number {
 
 // Puntos por método de pago.
 function puntosMetodoPago(v: string | undefined): number {
-  const n = norm(v);
-  if (n.includes("efectivo")) return 3;
-  if (n.includes("hipotecario") && n.includes("aprobad")) return 3;
-  if (n.includes("credito") && (n.includes("tramite") || n.includes("gestion")))
-    return 1;
+  const categoria = categoriaMetodoPago(v);
+  if (categoria === "Efectivo listo") return 3;
+  if (categoria === "Crédito hipotecario aprobado") return 3;
+  if (categoria === "Crédito en trámite") return 1;
   return 0;
 }
 
@@ -128,8 +143,8 @@ export function matchEnCatalogo(perfil: LeadProfileForScoring): boolean {
 // efectivo listo o crédito hipotecario aprobado. Tener la plata disponible
 // pesa más que cualquier otro factor para definir la prioridad.
 function plataDisponible(v: string | undefined): boolean {
-  const n = norm(v);
-  return n.includes("efectivo") || (n.includes("hipotecario") && n.includes("aprobad"));
+  const categoria = categoriaMetodoPago(v);
+  return categoria === "Efectivo listo" || categoria === "Crédito hipotecario aprobado";
 }
 
 /**
@@ -143,10 +158,9 @@ function plataDisponible(v: string | undefined): boolean {
  * Prioridad (Venta):
  *   - Si tiene la plata disponible (efectivo listo o crédito hipotecario
  *     aprobado) => Alta directamente, sin importar la urgencia ni los puntos.
- *   - Si el método de pago NO es efectivo listo ni crédito hipotecario aprobado
- *     (crédito en trámite o sin definir), la prioridad NUNCA puede ser Alta: el
- *     máximo es Media, y cae a Baja si el puntaje sin contar financiación
- *     (urgencia + match + completitud) es 2 o menos.
+   *   - Efectivo listo o crédito hipotecario aprobado => Alta directa.
+   *   - Crédito en trámite => techo máximo Media.
+   *   - Sin iniciar => techo máximo Baja.
  *
  * El puntaje numérico NO cambia: siempre se calcula con los 4 factores.
  */
@@ -179,15 +193,16 @@ export function computeLeadScore(
   const puntaje = pIntencion + pPago + pMatch + pCompletitud; // 0–9
 
   let prioridad: "Alta" | "Media" | "Baja";
+  const categoriaPago = categoriaMetodoPago(perfil.metodoPagoCategoria);
   if (plataDisponible(perfil.metodoPagoCategoria)) {
     // Plata disponible (efectivo o crédito hipotecario aprobado) => Alta directo.
     prioridad = "Alta";
+  } else if (categoriaPago === "Sin iniciar") {
+    // Quiere crédito pero todavía no inició trámite, o no lo definió: techo Baja.
+    prioridad = "Baja";
   } else {
-    // Tope de prioridad: si el método de pago NO es "Efectivo listo" ni
-    // "Crédito hipotecario aprobado" (es crédito en trámite o sin definir), la
-    // prioridad NUNCA puede ser Alta, sin importar el puntaje total. El máximo es
-    // Media, y cae a Baja si el puntaje sin contar financiación (urgencia + match
-    // + completitud) es muy bajo (2 o menos).
+    // Crédito en trámite: techo máximo Media. Si el puntaje sin financiación
+    // (urgencia + match + completitud) es muy bajo, cae a Baja.
     const sinFinanciacion = pIntencion + pMatch + pCompletitud;
     prioridad = sinFinanciacion <= 2 ? "Baja" : "Media";
   }
