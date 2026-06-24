@@ -464,16 +464,18 @@ export function PropBot({
       }
 
       await botSay(
-        `Saludá a ${firstName(lead.nombre)} por su nombre y, con entusiasmo, contale que viste que se interesó en esta propiedad: ${propDesc}. Presentate brevemente como asesor inmobiliario. No hagas preguntas todavía: la tarjeta de la propiedad se muestra debajo de tu mensaje.`,
-        `¡Hola ${firstName(lead.nombre)}! Vi que te interesaste en esta propiedad:`,
-        { card: property },
+        `Sos vos, el asesor inmobiliario, quien escribe este mensaje (no el usuario). Saludá a ${firstName(lead.nombre)} por su nombre, presentate en una frase como asesor y mencioná brevemente que se interesó en esta propiedad: ${propDesc}. Inmediatamente después arrancá con la PRIMERA pregunta de calificación del flujo: si está buscando comprar o alquilar. Es una sola pregunta, breve, en tono rioplatense. La tarjeta de la propiedad se muestra debajo de tu mensaje, no la repitas en texto.`,
+        `¡Hola ${firstName(lead.nombre)}! Soy tu asesor para esta propiedad. Para arrancar, contame: ¿la estás buscando para comprar o para alquilar?`,
+        {
+          card: property,
+          quickReplies: [
+            { label: "Comprar", value: "Comprar" },
+            { label: "Alquilar", value: "Alquilar" },
+          ],
+        },
         650,
       );
-      await new Promise((r) => setTimeout(r, 300));
-      await botSay(
-        "Invitá al usuario, de forma abierta y cálida, a contarte qué está buscando o a preguntarte lo que quiera sobre la propiedad. No le des opciones cerradas ni hagas una pregunta de calificación todavía; dejá que lleve la conversación.",
-        "Contame, ¿qué te gustaría saber o qué estás buscando? Estoy para ayudarte con lo que necesites.",
-      );
+
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
