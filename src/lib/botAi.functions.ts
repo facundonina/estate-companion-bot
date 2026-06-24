@@ -133,7 +133,13 @@ export type BotAction =
         plazoCompra?: string;
       };
     }
-  | { type: "agendar_reunion"; slots: CalendarSlot[] };
+  | { type: "agendar_reunion"; slots: CalendarSlot[] }
+  | {
+      type: "registrar_lead";
+      puntaje: number;
+      prioridad: string;
+      matchEnCatalogo: boolean;
+    };
 
 export interface ChatResult {
   text: string | null;
