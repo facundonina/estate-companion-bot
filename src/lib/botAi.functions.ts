@@ -374,6 +374,9 @@ export const chatWithBot = createServerFn({ method: "POST" })
           : null,
         p.urgencia ? `urgencia: ${p.urgencia}` : null,
         p.plazoCompra ? `plazo de compra: ${p.plazoCompra}` : null,
+        typeof p.plazoMeses === "number"
+          ? `plazo en meses: ${p.plazoMeses}`
+          : null,
       ].filter(Boolean);
       contextLines.push(
         perfilLines.length
