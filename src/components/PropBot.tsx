@@ -65,6 +65,7 @@ function scoreProp(p: Property, lead: BotLeadState): number {
 }
 
 interface BotLeadState extends BotLead {
+  operacion?: string;
   zona?: string;
   tipo?: string;
   dormitorios?: number;
