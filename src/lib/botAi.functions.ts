@@ -582,6 +582,7 @@ export const generateBotMessage = createServerFn({ method: "POST" })
 // pregunta ni controla el flujo. Devuelve siempre un objeto seguro.
 // ===========================================================================
 export interface ProfilePatch {
+  operacion: string | null;
   financiamiento: string | null;
   presupuesto: number | null;
   urgencia: string | null;
@@ -603,12 +604,18 @@ const interpretInputSchema = z.object({
 export const interpretAnswer = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => interpretInputSchema.parse(data))
   .handler(async ({ data }): Promise<ProfilePatch> => {
+    // Detección determinística de la operación a partir de sinónimos comunes
+    // (comprar/compra -> Venta; alquilar/rentar -> Alquiler). Es independiente
+    // de la IA: garantiza que "comprar" no se pierda aunque el modelo falle.
+    const operacionDet = mapOperacion(data.message);
     const empty: ProfilePatch = {
+      operacion: operacionDet,
       financiamiento: null,
       presupuesto: null,
       urgencia: null,
       plazoCompra: null,
     };
+
     try {
       const provider = await getProvider();
       if (!provider) return empty;
