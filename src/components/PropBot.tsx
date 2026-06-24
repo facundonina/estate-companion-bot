@@ -263,6 +263,7 @@ export function PropBot({
     const l = leadRef.current;
     return {
       nombre: l.nombre,
+      operacion: l.operacion,
       ubicacion: l.zona,
       tipo: l.tipo,
       urgencia: l.urgencia,
