@@ -372,13 +372,7 @@ export const chatWithBot = createServerFn({ method: "POST" })
               .describe(
                 "Operación que busca el usuario: 'Venta' si quiere comprar, 'Alquiler' si quiere alquilar.",
               ),
-            metodo_pago_texto: z
-              .string()
-              .optional()
-              .describe(
-                "El texto literal que dijo el usuario sobre cómo piensa pagar, tal cual lo escribió o algo muy cercano.",
-              ),
-            metodo_pago_categoria: z
+            metodo_pago: z
               .enum([
                 "Efectivo listo",
                 "Crédito hipotecario aprobado",
@@ -387,47 +381,33 @@ export const chatWithBot = createServerFn({ method: "POST" })
               ])
               .optional()
               .describe(
-                "La categoría fija de método de pago que mejor corresponde a lo que dijo el usuario.",
+                "La categoría fija de método de pago que mejor corresponde a lo que dijo el usuario (interpretá su lenguaje natural y encasillalo en una de estas cuatro).",
               ),
             presupuesto: z
               .number()
               .optional()
               .describe("Presupuesto aproximado en USD"),
-            intencion_compra_texto: z
-              .string()
-              .optional()
-              .describe(
-                "El texto literal que dijo el usuario sobre para cuándo necesita la propiedad, tal cual lo escribió o algo muy cercano.",
-              ),
-            intencion_compra_categoria: z
+            intencion_compra: z
               .enum(["Menos de 3 meses", "3 a 6 meses", "En el año", "Sin definir"])
               .optional()
               .describe(
-                "La categoría fija de intención de compra / plazo de mudanza que mejor corresponde a lo que dijo el usuario.",
+                "La categoría fija de intención de compra / plazo de mudanza que mejor corresponde a lo que dijo el usuario (interpretá su lenguaje natural y encasillalo en una de estas cuatro).",
               ),
           }),
           execute: async (patch) => {
             const clean: {
               operacion?: string;
-              metodoPagoTexto?: string;
-              metodoPagoCategoria?: string;
+              metodoPago?: string;
               presupuesto?: number;
-              intencionCompraTexto?: string;
-              intencionCompraCategoria?: string;
+              intencionCompra?: string;
             } = {};
             if (patch.operacion) clean.operacion = patch.operacion;
-            if (patch.metodo_pago_texto)
-              clean.metodoPagoTexto = patch.metodo_pago_texto;
-            if (patch.metodo_pago_categoria)
-              clean.metodoPagoCategoria = normalizeMetodoPagoCategoria(
-                patch.metodo_pago_categoria,
-              );
+            if (patch.metodo_pago)
+              clean.metodoPago = normalizeMetodoPagoCategoria(patch.metodo_pago);
             if (typeof patch.presupuesto === "number" && patch.presupuesto > 0)
               clean.presupuesto = Math.round(patch.presupuesto);
-            if (patch.intencion_compra_texto)
-              clean.intencionCompraTexto = patch.intencion_compra_texto;
-            if (patch.intencion_compra_categoria)
-              clean.intencionCompraCategoria = patch.intencion_compra_categoria;
+            if (patch.intencion_compra)
+              clean.intencionCompra = patch.intencion_compra;
             actions.push({ type: "actualizar_perfil_lead", patch: clean });
             // Aplicamos el patch al perfil EN MEMORIA de esta misma llamada para
             // que las tools que corran después en el mismo turno (sobre todo
@@ -435,7 +415,7 @@ export const chatWithBot = createServerFn({ method: "POST" })
             // no el valor viejo con el que arrancó la request. Sin esto, el
             // usuario podía decir "quiero crédito pero todavía no arranqué" y el
             // bot ofrecía el calendario igual, porque agendar_reunion seguía
-            // viendo el metodoPagoCategoria anterior al patch.
+            // viendo el metodoPago anterior al patch.
             Object.assign(data.perfil, clean);
             return { ok: true };
           },
