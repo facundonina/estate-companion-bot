@@ -230,7 +230,25 @@ export function PropBot({
       financiamiento: l.financiamiento,
       presupuesto: l.presupuesto,
       plazoCompra: l.plazoCompra,
+      plazoMeses: l.plazoMeses,
     };
+  }, []);
+
+  // Recalcula el puntaje y la prioridad del lead de forma 100% dinámica,
+  // usando la operación y el precio real de la propiedad de interés actual.
+  const recomputeScore = useCallback((): string => {
+    const l = leadRef.current;
+    const prop = activePropRef.current;
+    const { puntaje, prioridad } = calcularLeadScore({
+      operacion: prop?.operacion,
+      financiamiento: l.financiamiento,
+      plazoMeses: l.plazoMeses,
+      precio: prop?.precio,
+    });
+    l.puntaje = puntaje;
+    l.prioridad = prioridad;
+    mergeStoredLead({ prioridad });
+    return prioridad;
   }, []);
 
   // Pide a Gemini que redacte un mensaje guiado por la app (saludo, opener).
