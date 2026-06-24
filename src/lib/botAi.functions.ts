@@ -524,6 +524,7 @@ export const interpretAnswer = createServerFn({ method: "POST" })
       presupuesto: null,
       urgencia: null,
       plazoCompra: null,
+      plazoMeses: null,
     };
     try {
       const provider = await getProvider();
