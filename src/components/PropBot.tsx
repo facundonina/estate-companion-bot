@@ -46,7 +46,7 @@ interface BotMessage {
   cards?: Property[];
   recCards?: Property[];
   agenda?: boolean;
-  quickReplies?: QuickReply[];
+  
   cta?: { label: string };
 }
 
