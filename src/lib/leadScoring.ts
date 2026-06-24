@@ -143,8 +143,10 @@ function plataDisponible(v: string | undefined): boolean {
  * Prioridad (Venta):
  *   - Si tiene la plata disponible (efectivo listo o crédito hipotecario
  *     aprobado) => Alta directamente, sin importar la urgencia ni los puntos.
- *   - En cualquier otro caso (crédito en trámite o método sin definir) sale de
- *     los cortes de siempre: >=6 Alta, 3–5 Media, <=2 Baja.
+ *   - Si el método de pago NO es efectivo listo ni crédito hipotecario aprobado
+ *     (crédito en trámite o sin definir), la prioridad NUNCA puede ser Alta: el
+ *     máximo es Media, y cae a Baja si el puntaje sin contar financiación
+ *     (urgencia + match + completitud) es 2 o menos.
  *
  * El puntaje numérico NO cambia: siempre se calcula con los 4 factores.
  */
