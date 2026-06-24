@@ -209,6 +209,10 @@ export function PropBot({
   const secondaryConfirmRef = useRef(false);
   // Marca si ya enviamos el lead al Sheet (para no duplicarlo).
   const leadSentRef = useRef(false);
+  // El usuario interactuó al menos una vez (mandó un mensaje o eligió horario).
+  const interactedRef = useRef(false);
+  // Timer de inactividad: registra el lead si pasan varios minutos sin actividad.
+  const inactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const chat = useServerFn(chatWithBot);
   const interpret = useServerFn(interpretAnswer);
