@@ -27,6 +27,11 @@ export interface LeadProfileForScoring {
   nombre?: string;
   telefono?: string;
   email?: string;
+  /**
+   * El usuario pidió explícitamente hablar con un humano / asesor real.
+   * Tiene prioridad sobre todos los demás gates: fuerza prioridad Baja.
+   */
+  solicitoHumano?: boolean;
 }
 
 export interface LeadScoreResult {
@@ -192,7 +197,13 @@ export function computeLeadScore(
 
   let prioridad: "Alta" | "Media" | "Baja";
   const categoriaPago = categoriaMetodoPago(perfil.metodoPago);
-  if (plataDisponible(perfil.metodoPago)) {
+  if (perfil.solicitoHumano) {
+    // Gate con prioridad sobre todos los demás: si el usuario pidió hablar con
+    // un humano, la prioridad es Baja directamente, sin importar el resto de
+    // los factores ni los gates de operación o método de pago. El puntaje
+    // numérico se sigue calculando igual que siempre.
+    prioridad = "Baja";
+  } else if (plataDisponible(perfil.metodoPago)) {
     // Plata disponible (efectivo o crédito hipotecario aprobado) => Alta directo.
     prioridad = "Alta";
   } else if (categoriaPago === "Sin iniciar") {

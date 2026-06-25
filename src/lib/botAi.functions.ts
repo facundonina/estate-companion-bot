@@ -48,7 +48,10 @@ Nunca repitas en tu respuesta de texto el resultado crudo (JSON, array, ni ning�
 Calificación del lead:
 Durante la conversación, identificá y guardá en el perfil del lead, vía actualizar_perfil_lead, estos campos a medida que vayan apareciendo: operación (si el usuario muestra interés en una propiedad puntual, la operación es la de esa propiedad y NO se la preguntes; solo preguntá si busca comprar o alquilar en charlas generales, cuando todavía no eligió ninguna propiedad puntual), zona, tipo de propiedad, presupuesto, intención de compra o plazo de mudanza, método de pago, y el ID de la propiedad puntual en la que el usuario mostró interés concreto entre los resultados de buscar_propiedades. El sistema registra al lead en la planilla automáticamente al final de la conversación (cuando se confirma la reunión o el usuario se despide); no tenés ninguna herramienta de registro, así que no intentes registrar nada vos mismo. Nunca calcules ni menciones vos mismo un puntaje o una categoría de prioridad — eso lo hace el sistema automáticamente, no es algo que tengas que decidir ni comunicar.
 
-Cuando el usuario te diga cómo piensa pagar o para cuándo necesita la propiedad, interpretá lo que dijo en lenguaje natural y guardá directamente la categoría fija que mejor corresponda (no guardes el texto literal, solo la categoría). Para método de pago (campo metodo_pago) usá exactamente una de estas cuatro categorías: Efectivo listo, Crédito hipotecario aprobado, Crédito en trámite, Sin iniciar. Al contado / tengo la plata / en efectivo equivalen a Efectivo listo. Crédito ya aprobado / preaprobado por el banco equivale a Crédito hipotecario aprobado. Crédito en trámite SOLO aplica si la persona ya está activamente tramitando con el banco, con gestión iniciada y documentación entregada o en evaluación. Si quiere crédito pero todavía no entregó papeles, no inició gestión con el banco, está averiguando, o no lo definió (por ejemplo "quiero crédito pero no inicié nada"), categorizalo como Sin iniciar, no como Crédito en trámite. Para intención de compra (campo intencion_compra) usá exactamente una de estas cuatro categorías: Menos de 3 meses, 3 a 6 meses, En el año, Sin definir. Lo antes posible / ya / necesito mudarme ya equivalen a Menos de 3 meses. Nunca dejes la categoría sin asignar si el usuario dio una respuesta que claramente corresponde a alguna de las opciones.`;
+Cuando el usuario te diga cómo piensa pagar o para cuándo necesita la propiedad, interpretá lo que dijo en lenguaje natural y guardá directamente la categoría fija que mejor corresponda (no guardes el texto literal, solo la categoría). Para método de pago (campo metodo_pago) usá exactamente una de estas cuatro categorías: Efectivo listo, Crédito hipotecario aprobado, Crédito en trámite, Sin iniciar. Al contado / tengo la plata / en efectivo equivalen a Efectivo listo. Crédito ya aprobado / preaprobado por el banco equivale a Crédito hipotecario aprobado. Crédito en trámite SOLO aplica si la persona ya está activamente tramitando con el banco, con gestión iniciada y documentación entregada o en evaluación. Si quiere crédito pero todavía no entregó papeles, no inició gestión con el banco, está averiguando, o no lo definió (por ejemplo "quiero crédito pero no inicié nada"), categorizalo como Sin iniciar, no como Crédito en trámite. Para intención de compra (campo intencion_compra) usá exactamente una de estas cuatro categorías: Menos de 3 meses, 3 a 6 meses, En el año, Sin definir. Lo antes posible / ya / necesito mudarme ya equivalen a Menos de 3 meses. Nunca dejes la categoría sin asignar si el usuario dio una respuesta que claramente corresponde a alguna de las opciones.
+
+Pedido de hablar con un humano (atajo de salida):
+Si en cualquier momento de la conversación el usuario expresa que quiere hablar con un humano, una persona real, un asesor, o algo equivalente, como por ejemplo "quiero hablar con un humano", "pasame con una persona", "no quiero hablar con un bot", o cualquier variante en lenguaje natural con esa misma intención, dejá de inmediato cualquier pregunta de calificación pendiente. Respondé únicamente con un mensaje breve confirmando que un asesor se va a poner en contacto, por ejemplo: "Perfecto, ya te contactaremos con un asesor." No sigas preguntando nada más después de esto. Además, apenas detectes esa intención, marcá el campo solicito_humano como verdadero con actualizar_perfil_lead.`;
 
 // Reglas de salida para la burbuja de chat.
 const STYLE_RULES = `Reglas de salida:
@@ -199,6 +202,7 @@ export type BotAction =
         metodoPago?: string;
         presupuesto?: number;
         intencionCompra?: string;
+        solicitoHumano?: boolean;
       };
     }
   | { type: "agendar_reunion"; slots: CalendarSlot[] };
@@ -393,6 +397,12 @@ export const chatWithBot = createServerFn({ method: "POST" })
               .describe(
                 "La categoría fija de intención de compra / plazo de mudanza que mejor corresponde a lo que dijo el usuario (interpretá su lenguaje natural y encasillalo en una de estas cuatro).",
               ),
+            solicito_humano: z
+              .boolean()
+              .optional()
+              .describe(
+                "Marcalo como true apenas el usuario exprese que quiere hablar con un humano, una persona real o un asesor (cualquier variante en lenguaje natural con esa intención).",
+              ),
           }),
           execute: async (patch) => {
             const clean: {
@@ -400,6 +410,7 @@ export const chatWithBot = createServerFn({ method: "POST" })
               metodoPago?: string;
               presupuesto?: number;
               intencionCompra?: string;
+              solicitoHumano?: boolean;
             } = {};
             if (patch.operacion) clean.operacion = patch.operacion;
             if (patch.metodo_pago)
@@ -408,6 +419,7 @@ export const chatWithBot = createServerFn({ method: "POST" })
               clean.presupuesto = Math.round(patch.presupuesto);
             if (patch.intencion_compra)
               clean.intencionCompra = patch.intencion_compra;
+            if (patch.solicito_humano === true) clean.solicitoHumano = true;
             actions.push({ type: "actualizar_perfil_lead", patch: clean });
             // Aplicamos el patch al perfil EN MEMORIA de esta misma llamada para
             // que las tools que corran después en el mismo turno (sobre todo

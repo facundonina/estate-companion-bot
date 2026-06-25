@@ -32,6 +32,7 @@ type LeadPatch = {
   metodoPago?: string;
   presupuesto?: number;
   intencionCompra?: string;
+  solicitoHumano?: boolean;
 };
 
 type Slot = CalendarSlot;
@@ -92,6 +93,8 @@ interface BotLeadState extends BotLead {
   metodoPago?: string;
   // Intención de compra / plazo: una de las categorías fijas.
   intencionCompra?: string;
+  // El usuario pidió hablar con un humano / asesor real.
+  solicitoHumano?: boolean;
   prioridad?: string;
 }
 
@@ -103,6 +106,7 @@ function calcPrioridad(lead: BotLeadState): string {
     presupuesto: lead.presupuesto,
     intencionCompra: lead.intencionCompra,
     metodoPago: lead.metodoPago,
+    solicitoHumano: lead.solicitoHumano,
     nombre: lead.nombre,
     telefono: lead.telefono,
     email: lead.email,
@@ -122,6 +126,7 @@ function buildLeadRow(lead: BotLeadState, prop: Property): LeadRow {
     presupuesto: lead.presupuesto,
     intencionCompra: lead.intencionCompra,
     metodoPago: lead.metodoPago,
+    solicitoHumano: lead.solicitoHumano,
     propiedadInteresId: prop.id,
     nombre: lead.nombre,
     telefono: lead.telefono,
@@ -153,7 +158,8 @@ function tieneDatosCalificacion(lead: BotLeadState): boolean {
     lead.operacion ||
       typeof lead.presupuesto === "number" ||
       lead.intencionCompra ||
-      lead.metodoPago,
+      lead.metodoPago ||
+      lead.solicitoHumano,
   );
 }
 
@@ -373,6 +379,10 @@ export function PropBot({
       l.intencionCompra = patch.intencionCompra;
       changed = true;
     }
+    if (patch.solicitoHumano) {
+      l.solicitoHumano = true;
+      changed = true;
+    }
     if (changed) {
       l.prioridad = calcPrioridad(l);
       mergeStoredLead({
@@ -473,9 +483,11 @@ export function PropBot({
 
       const extra: Omit<BotMessage, "id" | "role" | "text"> = {};
 
+      let pidioHumano = false;
       for (const a of result?.actions ?? []) {
         if (a.type === "actualizar_perfil_lead") {
           applyPatch(a.patch);
+          if (a.patch.solicitoHumano) pidioHumano = true;
         } else if (a.type === "buscar_propiedades") {
           const cards = a.ids
             .map((id) => properties.find((p) => p.id === id))
@@ -490,6 +502,15 @@ export function PropBot({
             extra.agenda = true;
           }
         }
+      }
+
+      // Tercer disparador de cierre inmediato (junto a la confirmación de agenda
+      // y la despedida del usuario): si el usuario pidió hablar con un humano,
+      // registramos el lead YA con los datos que existan hasta ahora, sin esperar
+      // el timeout de inactividad ni el cierre de pestaña.
+      if (pidioHumano) {
+        registerLead();
+        setDone(true);
       }
 
       // El lead NO se registra acá: se registra recién al final de la
@@ -510,7 +531,7 @@ export function PropBot({
       addMsg({ role: "bot", text, ...extra });
 
     },
-    [chat, interpret, fullHistory, buildPerfil, applyPatch, addMsg],
+    [chat, interpret, fullHistory, buildPerfil, applyPatch, addMsg, registerLead],
   );
 
   // Kick off the conversation once.
