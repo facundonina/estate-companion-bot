@@ -397,6 +397,12 @@ export const chatWithBot = createServerFn({ method: "POST" })
               .describe(
                 "La categoría fija de intención de compra / plazo de mudanza que mejor corresponde a lo que dijo el usuario (interpretá su lenguaje natural y encasillalo en una de estas cuatro).",
               ),
+            solicito_humano: z
+              .boolean()
+              .optional()
+              .describe(
+                "Marcalo como true apenas el usuario exprese que quiere hablar con un humano, una persona real o un asesor (cualquier variante en lenguaje natural con esa intención).",
+              ),
           }),
           execute: async (patch) => {
             const clean: {
@@ -404,6 +410,7 @@ export const chatWithBot = createServerFn({ method: "POST" })
               metodoPago?: string;
               presupuesto?: number;
               intencionCompra?: string;
+              solicitoHumano?: boolean;
             } = {};
             if (patch.operacion) clean.operacion = patch.operacion;
             if (patch.metodo_pago)
@@ -412,6 +419,7 @@ export const chatWithBot = createServerFn({ method: "POST" })
               clean.presupuesto = Math.round(patch.presupuesto);
             if (patch.intencion_compra)
               clean.intencionCompra = patch.intencion_compra;
+            if (patch.solicito_humano === true) clean.solicitoHumano = true;
             actions.push({ type: "actualizar_perfil_lead", patch: clean });
             // Aplicamos el patch al perfil EN MEMORIA de esta misma llamada para
             // que las tools que corran después en el mismo turno (sobre todo
