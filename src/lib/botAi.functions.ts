@@ -202,6 +202,7 @@ export type BotAction =
         metodoPago?: string;
         presupuesto?: number;
         intencionCompra?: string;
+        solicitoHumano?: boolean;
       };
     }
   | { type: "agendar_reunion"; slots: CalendarSlot[] };
