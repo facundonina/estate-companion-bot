@@ -27,6 +27,11 @@ export interface LeadProfileForScoring {
   nombre?: string;
   telefono?: string;
   email?: string;
+  /**
+   * El usuario pidió explícitamente hablar con un humano / asesor real.
+   * Tiene prioridad sobre todos los demás gates: fuerza prioridad Baja.
+   */
+  solicitoHumano?: boolean;
 }
 
 export interface LeadScoreResult {
