@@ -126,6 +126,7 @@ function buildLeadRow(lead: BotLeadState, prop: Property): LeadRow {
     presupuesto: lead.presupuesto,
     intencionCompra: lead.intencionCompra,
     metodoPago: lead.metodoPago,
+    solicitoHumano: lead.solicitoHumano,
     propiedadInteresId: prop.id,
     nombre: lead.nombre,
     telefono: lead.telefono,
