@@ -379,6 +379,10 @@ export function PropBot({
       l.intencionCompra = patch.intencionCompra;
       changed = true;
     }
+    if (patch.solicitoHumano) {
+      l.solicitoHumano = true;
+      changed = true;
+    }
     if (changed) {
       l.prioridad = calcPrioridad(l);
       mergeStoredLead({
