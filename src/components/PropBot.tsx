@@ -32,6 +32,7 @@ type LeadPatch = {
   metodoPago?: string;
   presupuesto?: number;
   intencionCompra?: string;
+  solicitoHumano?: boolean;
 };
 
 type Slot = CalendarSlot;
