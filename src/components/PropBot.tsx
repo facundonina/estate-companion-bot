@@ -531,7 +531,7 @@ export function PropBot({
       addMsg({ role: "bot", text, ...extra });
 
     },
-    [chat, interpret, fullHistory, buildPerfil, applyPatch, addMsg],
+    [chat, interpret, fullHistory, buildPerfil, applyPatch, addMsg, registerLead],
   );
 
   // Kick off the conversation once.
