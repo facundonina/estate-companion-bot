@@ -93,6 +93,8 @@ interface BotLeadState extends BotLead {
   metodoPago?: string;
   // Intención de compra / plazo: una de las categorías fijas.
   intencionCompra?: string;
+  // El usuario pidió hablar con un humano / asesor real.
+  solicitoHumano?: boolean;
   prioridad?: string;
 }
 
