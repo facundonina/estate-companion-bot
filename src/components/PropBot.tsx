@@ -483,9 +483,11 @@ export function PropBot({
 
       const extra: Omit<BotMessage, "id" | "role" | "text"> = {};
 
+      let pidioHumano = false;
       for (const a of result?.actions ?? []) {
         if (a.type === "actualizar_perfil_lead") {
           applyPatch(a.patch);
+          if (a.patch.solicitoHumano) pidioHumano = true;
         } else if (a.type === "buscar_propiedades") {
           const cards = a.ids
             .map((id) => properties.find((p) => p.id === id))
@@ -500,6 +502,15 @@ export function PropBot({
             extra.agenda = true;
           }
         }
+      }
+
+      // Tercer disparador de cierre inmediato (junto a la confirmación de agenda
+      // y la despedida del usuario): si el usuario pidió hablar con un humano,
+      // registramos el lead YA con los datos que existan hasta ahora, sin esperar
+      // el timeout de inactividad ni el cierre de pestaña.
+      if (pidioHumano) {
+        registerLead();
+        setDone(true);
       }
 
       // El lead NO se registra acá: se registra recién al final de la
