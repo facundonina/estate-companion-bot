@@ -158,7 +158,8 @@ function tieneDatosCalificacion(lead: BotLeadState): boolean {
     lead.operacion ||
       typeof lead.presupuesto === "number" ||
       lead.intencionCompra ||
-      lead.metodoPago,
+      lead.metodoPago ||
+      lead.solicitoHumano,
   );
 }
 
