@@ -106,6 +106,7 @@ function calcPrioridad(lead: BotLeadState): string {
     presupuesto: lead.presupuesto,
     intencionCompra: lead.intencionCompra,
     metodoPago: lead.metodoPago,
+    solicitoHumano: lead.solicitoHumano,
     nombre: lead.nombre,
     telefono: lead.telefono,
     email: lead.email,
